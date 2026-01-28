@@ -20,6 +20,7 @@
 #include <openrct2/SpriteIds.h>
 #include <openrct2/actions/CheatSetAction.h>
 #include <openrct2/actions/ParkSetDateAction.h>
+#include <openrct2/config/Config.h>
 #include <openrct2/core/EnumUtils.hpp>
 #include <openrct2/drawing/Drawing.h>
 #include <openrct2/localisation/Currency.h>
@@ -56,16 +57,23 @@ static StringId _staffSpeedNames[] =
     STR_FAST,
 };
 
-static constexpr auto kWeatherTypes = std::to_array<std::pair<ImageIndex, StringId>>({
-    { SPR_WEATHER_SUN, STR_SUNNY },
-    { SPR_WEATHER_SUN_CLOUD, STR_PARTIALLY_CLOUDY },
-    { SPR_WEATHER_CLOUD, STR_CLOUDY },
-    { SPR_WEATHER_LIGHT_RAIN, STR_RAIN },
-    { SPR_WEATHER_HEAVY_RAIN, STR_HEAVY_RAIN },
-    { SPR_WEATHER_STORM, STR_THUNDERSTORM },
-    { SPR_G2_WEATHER_SNOW, STR_SNOW },
-    { SPR_G2_WEATHER_HEAVY_SNOW, STR_HEAVY_SNOW },
-    { SPR_G2_WEATHER_BLIZZARD, STR_BLIZZARD },
+struct WeatherInfo
+{
+    ImageIndex smallIcon;
+    ImageIndex largeIcon;
+    StringId label;
+};
+
+static constexpr auto kWeatherTypes = std::to_array<WeatherInfo>({
+    { SPR_G2_WEATHER_SUN_SMALL, SPR_WEATHER_SUN, STR_SUNNY },
+    { SPR_G2_WEATHER_SUN_CLOUD_SMALL, SPR_WEATHER_SUN_CLOUD, STR_PARTIALLY_CLOUDY },
+    { SPR_G2_WEATHER_CLOUD_SMALL, SPR_WEATHER_CLOUD, STR_CLOUDY },
+    { SPR_G2_WEATHER_LIGHT_RAIN_SMALL, SPR_WEATHER_LIGHT_RAIN, STR_RAIN },
+    { SPR_G2_WEATHER_HEAVY_RAIN_SMALL, SPR_WEATHER_HEAVY_RAIN, STR_HEAVY_RAIN },
+    { SPR_G2_WEATHER_STORM_SMALL, SPR_WEATHER_STORM, STR_THUNDERSTORM },
+    { SPR_G2_WEATHER_SNOW_SMALL, SPR_G2_WEATHER_SNOW, STR_SNOW },
+    { SPR_G2_WEATHER_HEAVY_SNOW_SMALL, SPR_G2_WEATHER_HEAVY_SNOW, STR_HEAVY_SNOW },
+    { SPR_G2_WEATHER_BLIZZARD_SMALL, SPR_G2_WEATHER_BLIZZARD, STR_BLIZZARD },
 });
 
 enum WindowCheatsWidgetIdx
@@ -341,7 +349,7 @@ static constexpr auto window_cheats_rides_widgets = makeWidgets(
 static constexpr auto window_cheats_weather_widgets = makeWidgets(
     kMainCheatWidgets,
     makeWidget        ({  5,  48}, {238,  50},       WidgetType::groupbox,     WindowColour::secondary, STR_CHEAT_WEATHER_GROUP                                      ), // Weather group
-    makeWidget        ({126,  62}, {111,  14},       WidgetType::dropdownMenu, WindowColour::secondary, kStringIdNone,                   STR_CHANGE_WEATHER_TOOLTIP  ), // Force weather
+    makeWidget        ({126,  62}, {111,  14},       WidgetType::dropdownMenu, WindowColour::secondary, STR_WEATHER_CAPTION,             STR_CHANGE_WEATHER_TOOLTIP  ), // Force weather
     makeWidget        ({225,  63}, { 11,  12},       WidgetType::button,       WindowColour::secondary, STR_DROPDOWN_GLYPH,              STR_CHANGE_WEATHER_TOOLTIP  ), // Force weather
     makeWidget        ({ 11,  80}, kCheatCheckSize,  WidgetType::checkbox,     WindowColour::secondary, STR_CHEAT_FREEZE_WEATHER,        STR_CHEAT_FREEZE_WEATHER_TIP), // Freeze weather
     makeWidget        ({  5, 102}, {238,  37},       WidgetType::groupbox,     WindowColour::secondary, STR_FAUNA                                                    ), // Fauna group
@@ -577,7 +585,10 @@ static StringId window_cheats_page_titles[] = {
             if (page == WINDOW_CHEATS_PAGE_WEATHER)
             {
                 auto& weatherType = kWeatherTypes[EnumValue(gameState.weatherCurrent.weatherType)];
-                widgets[WIDX_WEATHER].text = weatherType.second;
+
+                auto ft = Formatter::Common();
+                ft.Add<uint32_t>(weatherType.smallIcon);
+                ft.Add<StringId>(weatherType.label);
             }
 
             // Staff speed
@@ -1004,22 +1015,37 @@ static StringId window_cheats_page_titles[] = {
             {
                 case WIDX_WEATHER_DROPDOWN_BUTTON:
                 {
-                    auto& dropdownWidget = widgets[widgetIndex - 1];
+                    const auto& dropdownWidget = widgets[widgetIndex - 1];
+                    const bool isEnlarged = Config::Get().interface.enlargedUi;
+                    const auto currentSelection = EnumValue(getGameState().weatherCurrent.weatherType);
+
+                    const auto itemWidth = dropdownWidget.width() + (isEnlarged ? 30 : 22) - 3;
+                    const auto itemHeight = isEnlarged ? 20 : 12; // !!! TTF?
+
+                    const auto format = isEnlarged ? STR_WEATHER_DROPDOWN_ITEM_ENLARGED : STR_DROPDOWN_MENU_LABEL;
+                    const auto formatAlt = isEnlarged ? STR_WEATHER_DROPDOWN_ITEM_ENLARGED_SELECTED
+                                                      : STR_DROPDOWN_MENU_LABEL_SELECTED;
+
                     auto i = 0u;
                     for (auto& weatherType : kWeatherTypes)
                     {
-                        Formatter fmt;
-                        fmt.Add<uint32_t>(weatherType.first);
-                        fmt.Add<StringId>(weatherType.second);
+                        Formatter ft;
+                        if (!isEnlarged)
+                            ft.Add<StringId>(STR_WEATHER_DROPDOWN_ITEM);
 
-                        gDropdown.items[i] = Dropdown::PlainMenuLabel(STR_WEATHER_DROPDOWN_ITEM, fmt);
+                        ft.Add<uint32_t>(isEnlarged ? weatherType.largeIcon : weatherType.smallIcon);
+                        ft.Add<StringId>(weatherType.label);
+
+                        // Workaround: DIY to keep selection indicator aligned with label
+                        auto label = i == currentSelection ? formatAlt : format;
+                        gDropdown.items[i] = Dropdown::PlainMenuLabel(label, ft);
+
                         i++;
                     }
 
                     WindowDropdownShowTextCustomWidth(
-                        { windowPos.x - 30 + dropdownWidget.left, windowPos.y + dropdownWidget.bottom }, 0, colours[1], 20,
-                        Dropdown::Flag::CustomHeight | Dropdown::Flag::StayOpen, std::size(kWeatherTypes),
-                        dropdownWidget.width() + 26);
+                        { windowPos.x + dropdownWidget.left, windowPos.y + dropdownWidget.bottom }, 0, colours[1], itemHeight,
+                        Dropdown::Flag::CustomHeight | Dropdown::Flag::StayOpen, std::size(kWeatherTypes), itemWidth);
                 }
             }
         }
