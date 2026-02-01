@@ -32,6 +32,7 @@
 #include "core/Path.hpp"
 #include "core/String.hpp"
 #include "drawing/Drawing.h"
+#include "drawing/ScrollingText.h"
 #include "entity/EntityList.h"
 #include "entity/EntityRegistry.h"
 #include "entity/PatrolArea.h"
@@ -361,6 +362,10 @@ void GameLoadInit()
     snapshots->Reset();
 
     context->SetActiveScene(context->GetGameScene());
+
+    // Invalidate scrolling text cache to prevent stale text from previous park
+    // being displayed due to pointer value reuse in the cache matching logic
+    Drawing::ScrollingText::invalidate();
 
     if (!gLoadKeepWindowsOpen)
     {
