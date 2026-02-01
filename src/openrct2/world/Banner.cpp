@@ -52,6 +52,11 @@ std::string Banner::getText() const
 
 void Banner::formatTextWithColourTo(Formatter& ft) const
 {
+    // Use thread_local buffer to avoid race conditions during multithreaded rendering.
+    // Multiple threads can call this on the same Banner simultaneously when rendering
+    // different viewport columns in parallel.
+    thread_local std::string formattedTextBuffer;
+
     auto formatToken = FormatTokenFromTextColour(textColour);
     formattedTextBuffer = FormatTokenToStringWithBraces(formatToken);
     ft.Add<StringId>(STR_STRING_STRINGID);

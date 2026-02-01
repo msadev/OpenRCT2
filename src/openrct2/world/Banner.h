@@ -48,7 +48,6 @@ struct Banner
     OpenRCT2::ObjectEntryIndex type = kBannerNull;
     BannerFlags flags{};
     std::string text;
-    mutable std::string formattedTextBuffer;
     OpenRCT2::Drawing::Colour colour{};
     RideId rideIndex{};
     OpenRCT2::Drawing::TextColour textColour{};
