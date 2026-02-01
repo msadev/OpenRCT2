@@ -13,6 +13,7 @@
 - Fix: [#18441] Replacing footpaths sometimes results in a spurious “Footpath in the way” error (original bug).
 - Fix: [#20620] In-game console caret does not update when pasting.
 - Fix: [#20652] Twister Roller Coaster design ‘u(0241)’ has no preview and cannot be built (bug in track design).
+- Fix: [#23859] Wrong banner text displayed after loading a different park.
 - Fix: [#25221] When trying to cancel game file discovery, the prompt reappears.
 - Fix: [#25703, #25889] Crash when scanning scenarios with packed objects in parallel.
 - Fix: [#25739] Game freezes when a tab in the New Ride window contains more than 384 items.
@@ -24,7 +25,8 @@
 - Fix: [#25854] When a guest is at 0 happiness or energy, the game draws too big of a bar in the guest stats window.
 - Fix: [#25862] Diagonal and inclined brakes are not counted when calculating upkeep cost.
 - Fix: [#25873] Repainting a banner in OpenRCT2-specific colours results in an error message.
-- Fix: [#25879] Guest window viewport doesn’t follow vehicle when they board a ride. 
+- Fix: [#25879] Guest window viewport doesn’t follow vehicle when they board a ride.
+- Fix: [#25908] Crash from use-after-free in banner text formatting during multithreaded rendering. 
 - Fix: [objects#419] Alignment of RCT2 red, yellow and green queue previews is off.
 - Fix: [objects#424] Jet Aeroplane decor has a hole in it.
 - Fix: [objects#425] Capacity of ‘Blob from outer space ride’ is incorrectly listed.
