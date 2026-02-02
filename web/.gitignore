@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.parcel-cache/
+
+# Static files (built from WASM)
+static/openrct2.*
+static/assets.zip
+
+# Environment
+.env
+.env.local
