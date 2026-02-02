@@ -2,6 +2,9 @@
 
 /sdl
 
+# AI
+.claude
+
 # Compiled dll
 openrct2.dll
 

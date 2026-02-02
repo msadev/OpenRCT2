@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenRCT2 Web</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>OpenRCT2 Web</h1>
+            <p id="status-message">Initializing...</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="setup-screen" style="display: none;">
+        <div class="setup-content">
+            <h1>OpenRCT2 Web</h1>
+            <p>To play OpenRCT2, you need to provide your RCT2 game files.</p>
+            <div class="file-upload">
+                <label for="rct2-files">Select your RCT2 files (ZIP containing Data folder):</label>
+                <input type="file" id="rct2-files" accept=".zip">
+            </div>
+            <div id="upload-status"></div>
+            <button id="start-game" style="display: none;">Start Game</button>
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display: none;"></canvas>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

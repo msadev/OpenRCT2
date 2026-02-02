@@ -1,0 +1,37 @@
+{
+  "name": "openrct2-web",
+  "version": "1.0.0",
+  "description": "OpenRCT2 Web Port - RollerCoaster Tycoon 2 reimplementation in your browser",
+  "type": "module",
+  "scripts": {
+    "dev": "parcel serve src/index.html --port 3000",
+    "build": "parcel build src/index.html --dist-dir dist --public-url ./",
+    "build:wasm": "node scripts/build-wasm.js",
+    "build:all": "npm run build:wasm && npm run build",
+    "preview": "npx serve dist -l 3000",
+    "clean": "rm -rf dist .parcel-cache build-wasm"
+  },
+  "devDependencies": {
+    "parcel": "^2.12.0",
+    "parcel-reporter-static-files-copy": "^1.5.3",
+    "serve": "^14.2.0"
+  },
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Firefox versions",
+    "last 2 Safari versions",
+    "last 2 Edge versions"
+  ],
+  "keywords": [
+    "openrct2",
+    "rollercoaster-tycoon",
+    "game",
+    "wasm",
+    "emscripten"
+  ],
+  "license": "GPL-3.0",
+  "staticFiles": {
+    "staticPath": "static",
+    "watcherGlob": "**"
+  }
+}

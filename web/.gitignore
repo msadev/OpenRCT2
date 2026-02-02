@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.parcel-cache/
+static/openrct2.*
+static/assets.zip
+.env
+.env.local

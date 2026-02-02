@@ -1,0 +1,48 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#loading-screen, #setup-screen { text-align: center; padding: 2rem; }
+.loading-content h1, .setup-content h1 { font-size: 2.5rem; margin-bottom: 1rem; color: #e94560; }
+#status-message, .setup-content p { margin-bottom: 1.5rem; color: #a0a0a0; line-height: 1.6; }
+
+.progress-container {
+    width: 300px; height: 8px; background: #333;
+    border-radius: 4px; overflow: hidden; margin: 0 auto;
+}
+.progress-bar {
+    height: 100%; background: linear-gradient(90deg, #e94560, #ff6b6b);
+    width: 0%; transition: width 0.3s ease;
+}
+
+.file-upload { margin: 2rem 0; }
+.file-upload label { display: block; margin-bottom: 1rem; color: #ccc; }
+.file-upload input[type="file"] {
+    padding: 1rem; background: #2a2a4a; border: 2px dashed #555;
+    border-radius: 8px; color: #fff; cursor: pointer; width: 100%;
+}
+.file-upload input[type="file"]:hover { border-color: #e94560; }
+
+#upload-status { margin: 1rem 0; padding: 1rem; border-radius: 8px; display: none; }
+#upload-status.success { display: block; background: #1a4d1a; color: #4caf50; }
+#upload-status.error { display: block; background: #4d1a1a; color: #f44336; }
+
+#start-game {
+    padding: 1rem 2rem; font-size: 1.2rem;
+    background: linear-gradient(135deg, #e94560, #ff6b6b);
+    border: none; border-radius: 8px; color: #fff; cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+#start-game:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4); }
+
+#canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+body.game-running #loading-screen, body.game-running #setup-screen { display: none !important; }
+body.game-running #canvas { display: block !important; }
