@@ -25,6 +25,14 @@ const RELEASE_DATA_FILES = ['g2.dat', 'fonts.dat', 'palettes.dat', 'tracks.dat']
 const OBJECTS_VERSION = '1.7.6';
 const OBJECTS_URL = `https://github.com/OpenRCT2/objects/releases/download/v${OBJECTS_VERSION}/objects.zip`;
 
+// Title sequences URL
+const TITLE_SEQUENCES_VERSION = '0.4.26';
+const TITLE_SEQUENCES_URL = `https://github.com/OpenRCT2/title-sequences/releases/download/v${TITLE_SEQUENCES_VERSION}/title-sequences.zip`;
+
+// OpenMusic URL (additional music styles for rides)
+const OPENMUSIC_VERSION = '1.6.1';
+const OPENMUSIC_URL = `https://github.com/OpenRCT2/OpenMusic/releases/download/v${OPENMUSIC_VERSION}/openmusic.zip`;
+
 async function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     const follow = (url) => {
@@ -182,6 +190,67 @@ async function downloadObjects(tempDir) {
   return true;
 }
 
+async function downloadTitleSequences(tempDir) {
+  console.log('Downloading title sequences...');
+  const zipPath = join(tempDir, 'title-sequences.zip');
+  await downloadFile(TITLE_SEQUENCES_URL, zipPath);
+
+  const sequenceDir = join(tempDir, 'sequence');
+  mkdirSync(sequenceDir, { recursive: true });
+
+  console.log('  Extracting title-sequences.zip...');
+  await extractZip(zipPath, sequenceDir);
+
+  // Count extracted files
+  const countFiles = (dir) => {
+    let count = 0;
+    const items = readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+      if (item.isDirectory()) {
+        count += countFiles(join(dir, item.name));
+      } else {
+        count++;
+      }
+    }
+    return count;
+  };
+
+  const fileCount = countFiles(sequenceDir);
+  console.log(`  Title sequences extracted successfully (${fileCount} files)`);
+  return true;
+}
+
+async function downloadOpenMusic(tempDir) {
+  console.log('Downloading OpenMusic (additional ride music)...');
+  const zipPath = join(tempDir, 'openmusic.zip');
+  await downloadFile(OPENMUSIC_URL, zipPath);
+
+  // Extract to object/official/music directory
+  const musicDir = join(tempDir, 'object', 'official', 'music');
+  mkdirSync(musicDir, { recursive: true });
+
+  console.log('  Extracting openmusic.zip...');
+  await extractZip(zipPath, musicDir);
+
+  // Count extracted files
+  const countFiles = (dir) => {
+    let count = 0;
+    const items = readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+      if (item.isDirectory()) {
+        count += countFiles(join(dir, item.name));
+      } else {
+        count++;
+      }
+    }
+    return count;
+  };
+
+  const fileCount = countFiles(musicDir);
+  console.log(`  OpenMusic extracted successfully (${fileCount} files)`);
+  return true;
+}
+
 /**
  * Recursively copy a directory
  */
@@ -231,7 +300,7 @@ async function main() {
   }
 
   // Folders to include in assets.zip
-  const foldersToInclude = ['language', 'shaders', 'title'];
+  const foldersToInclude = ['language', 'shaders'];
   // Files to include from data root
   const filesToInclude = ['changelog.txt', 'contributors.md', 'languages', 'object_mods.json'];
 
@@ -260,10 +329,28 @@ async function main() {
     console.log('Continuing without objects...');
   }
 
+  // Download title sequences (demo parks shown on title screen)
+  console.log('\n=== Downloading title sequences ===\n');
+  try {
+    await downloadTitleSequences(tempDir);
+  } catch (e) {
+    console.error('Failed to download title sequences:', e.message);
+    console.log('Continuing without title sequences...');
+  }
+
+  // Download OpenMusic (additional ride music styles)
+  console.log('\n=== Downloading OpenMusic ===\n');
+  try {
+    await downloadOpenMusic(tempDir);
+  } catch (e) {
+    console.error('Failed to download OpenMusic:', e.message);
+    console.log('Continuing without OpenMusic...');
+  }
+
   console.log('\n=== Creating assets.zip ===\n');
 
   // Remove temporary download files before creating the final ZIP
-  const tempFiles = ['release.zip', 'objects.zip'];
+  const tempFiles = ['release.zip', 'objects.zip', 'title-sequences.zip', 'openmusic.zip'];
   for (const tempFile of tempFiles) {
     const tempFilePath = join(tempDir, tempFile);
     if (existsSync(tempFilePath)) {
