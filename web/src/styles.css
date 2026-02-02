@@ -1,48 +1,328 @@
+/* RCT2 Style Theme */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+:root {
+    /* RCT2 Color Palette */
+    --rct-brown-dark: #3D2817;
+    --rct-brown-medium: #5C3D1E;
+    --rct-brown-light: #8B5A2B;
+    --rct-gold: #D4A017;
+    --rct-gold-light: #FFD700;
+    --rct-cream: #F5DEB3;
+    --rct-green: #228B22;
+    --rct-green-light: #32CD32;
+    --rct-red: #B22222;
+    --rct-red-light: #DC143C;
+    --rct-blue: #1E90FF;
+    --rct-white: #FFFEF0;
+    --rct-black: #1A1A0A;
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    background: var(--rct-brown-dark);
+    background-image:
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0,0,0,0.1) 2px,
+            rgba(0,0,0,0.1) 4px
+        );
+    color: var(--rct-cream);
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+    image-rendering: pixelated;
 }
 
-#loading-screen, #setup-screen { text-align: center; padding: 2rem; }
-.loading-content h1, .setup-content h1 { font-size: 2.5rem; margin-bottom: 1rem; color: #e94560; }
-#status-message, .setup-content p { margin-bottom: 1.5rem; color: #a0a0a0; line-height: 1.6; }
+/* Shared screen styles */
+#loading-screen, #setup-screen {
+    text-align: center;
+    padding: 2rem;
+    background: var(--rct-brown-medium);
+    border: 4px solid var(--rct-gold);
+    border-radius: 0;
+    box-shadow:
+        inset 2px 2px 0 var(--rct-brown-light),
+        inset -2px -2px 0 var(--rct-brown-dark),
+        4px 4px 0 var(--rct-black);
+    max-width: 500px;
+    width: 90%;
+}
 
+.loading-content h1, .setup-content h1 {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    color: var(--rct-gold-light);
+    text-shadow: 2px 2px 0 var(--rct-black);
+    letter-spacing: 2px;
+}
+
+#status-message, .setup-content > p {
+    margin-bottom: 1.5rem;
+    color: var(--rct-cream);
+    line-height: 1.8;
+    font-size: 0.6rem;
+}
+
+/* Unified Progress Bar Style */
 .progress-container {
-    width: 300px; height: 8px; background: #333;
-    border-radius: 4px; overflow: hidden; margin: 0 auto;
+    width: 100%;
+    max-width: 350px;
+    height: 20px;
+    background: var(--rct-black);
+    border: 3px solid var(--rct-gold);
+    margin: 0 auto;
+    box-shadow:
+        inset 2px 2px 0 rgba(0,0,0,0.5),
+        inset -1px -1px 0 rgba(255,255,255,0.1);
 }
+
 .progress-bar {
-    height: 100%; background: linear-gradient(90deg, #e94560, #ff6b6b);
-    width: 0%; transition: width 0.3s ease;
+    height: 100%;
+    background: linear-gradient(
+        180deg,
+        var(--rct-green-light) 0%,
+        var(--rct-green) 50%,
+        #1a6b1a 100%
+    );
+    width: 0%;
+    transition: width 0.15s ease;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.3);
 }
 
-.file-upload { margin: 2rem 0; }
-.file-upload label { display: block; margin-bottom: 1rem; color: #ccc; }
+.progress-detail {
+    margin-top: 0.75rem;
+    font-size: 0.5rem;
+    color: var(--rct-gold);
+    min-height: 1.2em;
+}
+
+/* Progress section (upload) */
+.progress-section {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid var(--rct-brown-light);
+}
+
+.progress-section p {
+    margin-bottom: 0.75rem;
+    color: var(--rct-cream);
+    font-size: 0.55rem;
+}
+
+/* File Upload */
+.file-upload {
+    margin: 1.5rem 0;
+}
+
+.file-upload label {
+    display: block;
+    margin-bottom: 1rem;
+    color: var(--rct-cream);
+    font-size: 0.55rem;
+    line-height: 1.6;
+}
+
 .file-upload input[type="file"] {
-    padding: 1rem; background: #2a2a4a; border: 2px dashed #555;
-    border-radius: 8px; color: #fff; cursor: pointer; width: 100%;
+    padding: 1rem;
+    background: var(--rct-brown-dark);
+    border: 3px solid var(--rct-gold);
+    color: var(--rct-cream);
+    cursor: pointer;
+    width: 100%;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.5rem;
+    box-shadow:
+        inset 2px 2px 0 rgba(0,0,0,0.3),
+        inset -2px -2px 0 rgba(255,255,255,0.1);
 }
-.file-upload input[type="file"]:hover { border-color: #e94560; }
 
-#upload-status { margin: 1rem 0; padding: 1rem; border-radius: 8px; display: none; }
-#upload-status.success { display: block; background: #1a4d1a; color: #4caf50; }
-#upload-status.error { display: block; background: #4d1a1a; color: #f44336; }
+.file-upload input[type="file"]:hover {
+    border-color: var(--rct-gold-light);
+    background: var(--rct-brown-medium);
+}
 
+.file-upload input[type="file"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Status Messages */
+#upload-status {
+    margin: 1rem 0;
+    padding: 0.75rem;
+    display: none;
+    font-size: 0.5rem;
+    border: 2px solid;
+}
+
+#upload-status.success {
+    display: block;
+    background: rgba(34, 139, 34, 0.3);
+    border-color: var(--rct-green);
+    color: var(--rct-green-light);
+}
+
+#upload-status.error {
+    display: block;
+    background: rgba(178, 34, 34, 0.3);
+    border-color: var(--rct-red);
+    color: var(--rct-red-light);
+}
+
+/* RCT2 Style Button */
 #start-game {
-    padding: 1rem 2rem; font-size: 1.2rem;
-    background: linear-gradient(135deg, #e94560, #ff6b6b);
-    border: none; border-radius: 8px; color: #fff; cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    padding: 1rem 2rem;
+    font-size: 0.7rem;
+    font-family: 'Press Start 2P', monospace;
+    background: linear-gradient(
+        180deg,
+        var(--rct-green-light) 0%,
+        var(--rct-green) 40%,
+        #1a6b1a 100%
+    );
+    border: 3px solid var(--rct-gold);
+    color: var(--rct-white);
+    cursor: pointer;
+    text-shadow: 2px 2px 0 var(--rct-black);
+    box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.3),
+        inset -2px -2px 0 rgba(0,0,0,0.3),
+        3px 3px 0 var(--rct-black);
+    transition: all 0.1s ease;
+    margin-top: 1rem;
 }
-#start-game:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4); }
 
-#canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
-body.game-running #loading-screen, body.game-running #setup-screen { display: none !important; }
-body.game-running #canvas { display: block !important; }
+#start-game:hover {
+    background: linear-gradient(
+        180deg,
+        #4AE04A 0%,
+        var(--rct-green-light) 40%,
+        var(--rct-green) 100%
+    );
+    transform: translate(-1px, -1px);
+    box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.3),
+        inset -2px -2px 0 rgba(0,0,0,0.3),
+        4px 4px 0 var(--rct-black);
+}
+
+#start-game:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+        inset -2px -2px 0 rgba(255,255,255,0.3),
+        inset 2px 2px 0 rgba(0,0,0,0.3),
+        1px 1px 0 var(--rct-black);
+}
+
+#start-game:disabled {
+    background: var(--rct-brown-light);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Canvas */
+#canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+body.game-running #loading-screen,
+body.game-running #setup-screen {
+    display: none !important;
+}
+
+body.game-running #canvas {
+    display: block !important;
+}
+
+/* Option buttons (Download from Archive.org) */
+.option-button {
+    padding: 0.8rem 1.5rem;
+    font-size: 0.6rem;
+    font-family: 'Press Start 2P', monospace;
+    background: linear-gradient(
+        180deg,
+        var(--rct-blue) 0%,
+        #1a70cc 40%,
+        #145090 100%
+    );
+    border: 3px solid var(--rct-gold);
+    color: var(--rct-white);
+    cursor: pointer;
+    text-shadow: 2px 2px 0 var(--rct-black);
+    box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.3),
+        inset -2px -2px 0 rgba(0,0,0,0.3),
+        3px 3px 0 var(--rct-black);
+    transition: all 0.1s ease;
+    width: 100%;
+}
+
+.option-button:hover {
+    background: linear-gradient(
+        180deg,
+        #3AA0FF 0%,
+        var(--rct-blue) 40%,
+        #1a70cc 100%
+    );
+    transform: translate(-1px, -1px);
+    box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.3),
+        inset -2px -2px 0 rgba(0,0,0,0.3),
+        4px 4px 0 var(--rct-black);
+}
+
+.option-button:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+        inset -2px -2px 0 rgba(255,255,255,0.3),
+        inset 2px 2px 0 rgba(0,0,0,0.3),
+        1px 1px 0 var(--rct-black);
+}
+
+.option-button:disabled {
+    background: var(--rct-brown-light);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.option-separator {
+    margin: 1rem 0;
+    color: var(--rct-gold);
+    font-size: 0.5rem;
+}
+
+#file-options-section {
+    margin: 1.5rem 0;
+}
+
+/* RCT2 decorative elements */
+.loading-content::before,
+.setup-content::before {
+    content: '';
+    display: block;
+    width: 64px;
+    height: 4px;
+    background: var(--rct-gold);
+    margin: 0 auto 1rem;
+}
+
+.loading-content::after,
+.setup-content::after {
+    content: '';
+    display: block;
+    width: 64px;
+    height: 4px;
+    background: var(--rct-gold);
+    margin: 1rem auto 0;
+}

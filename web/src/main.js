@@ -3,28 +3,59 @@
  */
 
 let Module = null;
+let hasRCT2Files = false;
+
+// Archive.org URL for RCT2 assets
+const ARCHIVE_ORG_URL = 'https://archive.org/compress/OpenRCT2Assets/formats=ZIP&file=/OpenRCT2Assets.zip';
 
 const loadingScreen = document.getElementById('loading-screen');
 const setupScreen = document.getElementById('setup-screen');
+const setupMessage = document.getElementById('setup-message');
+const fileOptionsSection = document.getElementById('file-options-section');
+const downloadRCT2Button = document.getElementById('download-rct2');
+const downloadProgressContainer = document.getElementById('download-progress-container');
+const downloadProgressText = document.getElementById('download-progress-text');
+const downloadProgressBar = document.getElementById('download-progress-bar');
 const statusMessage = document.getElementById('status-message');
 const progressBar = document.getElementById('progress-bar');
+const progressDetail = document.getElementById('progress-detail');
 const rct2FilesInput = document.getElementById('rct2-files');
 const uploadStatus = document.getElementById('upload-status');
+const uploadProgressContainer = document.getElementById('upload-progress-container');
+const uploadProgressText = document.getElementById('upload-progress-text');
+const uploadProgressBar = document.getElementById('upload-progress-bar');
 const startButton = document.getElementById('start-game');
 const canvas = document.getElementById('canvas');
 
-function setStatus(message, progress = null) {
+function setStatus(message, progress = null, detail = '') {
     statusMessage.textContent = message;
     if (progress !== null) progressBar.style.width = `${progress}%`;
+    if (progressDetail) progressDetail.textContent = detail;
+}
+
+function setUploadProgress(message, progress) {
+    uploadProgressText.textContent = message;
+    uploadProgressBar.style.width = `${progress}%`;
+}
+
+function setDownloadProgress(message, progress) {
+    downloadProgressText.textContent = message;
+    downloadProgressBar.style.width = `${progress}%`;
 }
 
 function showUploadError(msg) {
+    uploadProgressContainer.style.display = 'none';
+    downloadProgressContainer.style.display = 'none';
     uploadStatus.textContent = msg;
     uploadStatus.className = 'error';
     uploadStatus.style.display = 'block';
+    rct2FilesInput.disabled = false;
+    downloadRCT2Button.disabled = false;
 }
 
 function showUploadSuccess(msg) {
+    uploadProgressContainer.style.display = 'none';
+    downloadProgressContainer.style.display = 'none';
     uploadStatus.textContent = msg;
     uploadStatus.className = 'success';
     uploadStatus.style.display = 'block';
@@ -32,6 +63,56 @@ function showUploadSuccess(msg) {
 
 function fileExists(path) {
     try { Module.FS.readFile(path); return true; } catch { return false; }
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function updateSetupScreen() {
+    if (hasRCT2Files) {
+        setupMessage.textContent = 'RCT2 files found! Click Start Game to play.';
+        fileOptionsSection.style.display = 'none';
+        startButton.disabled = false;
+    } else {
+        setupMessage.textContent = 'To play, you need to provide your RCT2 game files.';
+        fileOptionsSection.style.display = 'block';
+        startButton.disabled = true;
+    }
+}
+
+/**
+ * Fetch with progress tracking
+ */
+async function fetchWithProgress(url, onProgress) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const contentLength = response.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+    if (!response.body || !total) {
+        // Fallback for browsers without streaming or unknown size
+        const blob = await response.blob();
+        onProgress(blob.size, blob.size);
+        return blob;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let loaded = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        onProgress(loaded, total);
+    }
+
+    return new Blob(chunks);
 }
 
 async function loadWasmModule() {
@@ -96,12 +177,15 @@ async function loadWasmModule() {
         setStatus('Loading saved data...', 80);
         await new Promise(resolve => Module.FS.syncfs(true, resolve));
 
-        setStatus('Checking assets...', 90);
+        setStatus('Checking assets...', 85);
         try {
             await updateAssets();
         } catch (e) {
             console.warn('Asset update skipped:', e);
         }
+
+        // Check if RCT2 files exist
+        hasRCT2Files = fileExists('/RCT/Data/ch.dat');
 
         setStatus('Ready!', 100);
         return true;
@@ -128,45 +212,57 @@ async function updateAssets() {
     if (currentVersion !== assetsVersion || assetsVersion.includes('DEBUG') || !hasG2) {
         console.log('Re-extracting assets (g2.dat exists:', hasG2, ')');
         console.log('Updating assets...');
+
+        setStatus('Downloading assets...', 85, 'Connecting...');
+
         try {
-            const response = await fetch('assets.zip');
-            console.log('assets.zip fetch response:', response.status, response.headers.get('content-type'));
-            const contentType = response.headers.get('content-type') || '';
-            // Only try to extract if it's actually a zip file (not HTML error page)
-            if (response.ok && !contentType.includes('text/html')) {
-                const blob = await response.blob();
-                console.log('assets.zip size:', blob.size);
-                // Check for ZIP magic number (PK)
-                const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
-                if (header[0] === 0x50 && header[1] === 0x4B) {
-                    console.log('Extracting assets.zip...');
-                    await extractZip(blob, '/OpenRCT2/');
-                    Module.FS.writeFile('/OpenRCT2/version', assetsVersion);
-                    console.log('Assets extracted successfully');
-                    // Debug: list contents of /OpenRCT2/
-                    try {
-                        const contents = Module.FS.readdir('/OpenRCT2/');
-                        console.log('/OpenRCT2/ contents:', contents);
-                    } catch (e) { console.log('Could not list /OpenRCT2/:', e); }
-                } else {
-                    console.log('assets.zip not found or not a valid ZIP file (magic:', header[0], header[1], ')');
-                }
+            const blob = await fetchWithProgress('assets.zip', (loaded, total) => {
+                const percent = Math.round((loaded / total) * 100);
+                setStatus('Downloading assets...', 85 + (percent * 0.1), `${formatBytes(loaded)} / ${formatBytes(total)}`);
+            });
+
+            console.log('assets.zip size:', blob.size);
+
+            // Check for ZIP magic number (PK)
+            const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+            if (header[0] === 0x50 && header[1] === 0x4B) {
+                setStatus('Extracting assets...', 95, 'Loading ZIP...');
+                await extractZipWithProgress(blob, '/OpenRCT2/', (current, total) => {
+                    const percent = Math.round((current / total) * 100);
+                    setStatus('Extracting assets...', 95 + (percent * 0.05), `${current}/${total} files`);
+                });
+                Module.FS.writeFile('/OpenRCT2/version', assetsVersion);
+                console.log('Assets extracted successfully');
+
+                // Debug: list contents of /OpenRCT2/
+                try {
+                    const contents = Module.FS.readdir('/OpenRCT2/');
+                    console.log('/OpenRCT2/ contents:', contents);
+                } catch (e) { console.log('Could not list /OpenRCT2/:', e); }
             } else {
-                console.log('assets.zip not available (this is OK)');
+                console.log('assets.zip not found or not a valid ZIP file (magic:', header[0], header[1], ')');
             }
-        } catch (e) { console.warn('Could not update assets:', e); }
+        } catch (e) {
+            console.warn('Could not update assets:', e);
+            setStatus('Checking assets...', 95, 'Assets not available');
+        }
     } else {
         console.log('Assets are up to date');
     }
 }
 
-async function extractZip(data, basePath) {
+async function extractZipWithProgress(data, basePath, onProgress) {
     const zip = new JSZip();
     const contents = await zip.loadAsync(data);
-    for (const [path, entry] of Object.entries(contents.files)) {
+    const files = Object.entries(contents.files);
+    const total = files.length;
+    let current = 0;
+
+    for (const [path, entry] of files) {
         // Convert Windows backslashes to forward slashes
         const normalizedPath = path.replace(/\\/g, '/');
         const fullPath = basePath + normalizedPath;
+
         if (entry.dir) {
             try { Module.FS.mkdir(fullPath); } catch {}
         } else {
@@ -179,6 +275,123 @@ async function extractZip(data, basePath) {
             }
             Module.FS.writeFile(fullPath, await entry.async('uint8array'));
         }
+
+        current++;
+        if (current % 50 === 0 || current === total) {
+            onProgress(current, total);
+        }
+    }
+}
+
+/**
+ * Download RCT2 files from Archive.org
+ */
+async function downloadFromArchive() {
+    // Disable buttons during download
+    downloadRCT2Button.disabled = true;
+    rct2FilesInput.disabled = true;
+    startButton.disabled = true;
+    uploadStatus.style.display = 'none';
+    downloadProgressContainer.style.display = 'block';
+
+    try {
+        setDownloadProgress('Connecting to Archive.org...', 0);
+
+        const blob = await fetchWithProgress(ARCHIVE_ORG_URL, (loaded, total) => {
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            setDownloadProgress(`Downloading... ${formatBytes(loaded)}${total > 0 ? ' / ' + formatBytes(total) : ''}`, percent);
+        });
+
+        console.log('Downloaded ZIP size:', blob.size);
+
+        // Check for ZIP magic number (PK)
+        const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+        if (header[0] !== 0x50 || header[1] !== 0x4B) {
+            throw new Error('Downloaded file is not a valid ZIP');
+        }
+
+        setDownloadProgress('Extracting files...', 50);
+
+        const zip = new JSZip();
+        const contents = await zip.loadAsync(blob);
+
+        // Find the Data folder in the ZIP (might be nested)
+        let basePath = '/RCT/';
+        let dataPrefix = '';
+
+        // Check various possible structures
+        if (contents.file('Data/ch.dat')) {
+            dataPrefix = '';
+        } else if (contents.file('RCT2/Data/ch.dat')) {
+            dataPrefix = 'RCT2/';
+        } else if (contents.file('OpenRCT2Assets/Data/ch.dat')) {
+            dataPrefix = 'OpenRCT2Assets/';
+        } else {
+            // Search for Data/ch.dat in any subfolder
+            for (const path of Object.keys(contents.files)) {
+                if (path.endsWith('Data/ch.dat')) {
+                    dataPrefix = path.replace('Data/ch.dat', '');
+                    break;
+                }
+            }
+        }
+
+        if (!contents.file(dataPrefix + 'Data/ch.dat')) {
+            throw new Error('ZIP does not contain valid RCT2 data files');
+        }
+
+        const files = Object.entries(contents.files);
+        const total = files.length;
+        let count = 0;
+
+        for (const [path, entry] of files) {
+            // Skip files outside the data prefix
+            if (dataPrefix && !path.startsWith(dataPrefix)) {
+                count++;
+                continue;
+            }
+
+            // Remove the prefix to get the relative path
+            const relativePath = dataPrefix ? path.slice(dataPrefix.length) : path;
+            if (!relativePath) {
+                count++;
+                continue;
+            }
+
+            const fullPath = basePath + relativePath;
+
+            if (entry.dir) {
+                try { Module.FS.mkdir(fullPath); } catch {}
+            } else {
+                // Create parent directories if needed
+                const parts = fullPath.split('/').filter(Boolean);
+                let currentPath = '';
+                for (let i = 0; i < parts.length - 1; i++) {
+                    currentPath += '/' + parts[i];
+                    try { Module.FS.mkdir(currentPath); } catch {}
+                }
+                Module.FS.writeFile(fullPath, await entry.async('uint8array'));
+            }
+
+            count++;
+            if (count % 20 === 0 || count === total) {
+                const percent = 50 + Math.round((count / total) * 45);
+                setDownloadProgress(`Extracting: ${relativePath.split('/').pop() || '...'}`, percent);
+            }
+        }
+
+        setDownloadProgress('Saving to browser storage...', 98);
+        await new Promise(resolve => Module.FS.syncfs(false, resolve));
+
+        hasRCT2Files = true;
+        showUploadSuccess('RCT2 files downloaded successfully!');
+        updateSetupScreen();
+    } catch (e) {
+        console.error('Error downloading from Archive.org:', e);
+        showUploadError(`Download failed: ${e.message}`);
+        downloadRCT2Button.disabled = false;
+        rct2FilesInput.disabled = false;
+        startButton.disabled = !hasRCT2Files;
     }
 }
 
@@ -186,34 +399,60 @@ async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Disable input and button during processing
+    rct2FilesInput.disabled = true;
+    downloadRCT2Button.disabled = true;
+    startButton.disabled = true;
+    uploadStatus.style.display = 'none';
+    uploadProgressContainer.style.display = 'block';
+
     try {
-        setStatus('Processing ZIP file...', 0);
+        setUploadProgress('Reading ZIP file...', 0);
+
         const zip = new JSZip();
         const contents = await zip.loadAsync(file);
 
         let basePath = '/RCT/';
         if (contents.file('Data/ch.dat')) basePath = '/RCT/';
         else if (contents.file('RCT/Data/ch.dat')) basePath = '/';
-        else { showUploadError('Invalid ZIP. Must contain Data/ch.dat'); return; }
-
-        let count = 0;
-        const total = Object.keys(contents.files).length;
-        for (const [path, entry] of Object.entries(contents.files)) {
-            const fullPath = basePath + path;
-            if (entry.dir) { try { Module.FS.mkdir(fullPath); } catch {} }
-            else { Module.FS.writeFile(fullPath, await entry.async('uint8array')); }
-            count++;
-            setStatus(`Extracting: ${path}`, Math.round((count / total) * 100));
+        else {
+            showUploadError('Invalid ZIP. Must contain Data/ch.dat');
+            return;
         }
 
-        setStatus('Saving files...', 100);
+        const files = Object.entries(contents.files);
+        const total = files.length;
+        let count = 0;
+
+        setUploadProgress(`Extracting files... (0/${total})`, 0);
+
+        for (const [path, entry] of files) {
+            const fullPath = basePath + path;
+            if (entry.dir) {
+                try { Module.FS.mkdir(fullPath); } catch {}
+            } else {
+                Module.FS.writeFile(fullPath, await entry.async('uint8array'));
+            }
+            count++;
+
+            // Update progress every 10 files or at the end
+            if (count % 10 === 0 || count === total) {
+                const percent = Math.round((count / total) * 95);
+                setUploadProgress(`Extracting: ${path.split('/').pop()}`, percent);
+            }
+        }
+
+        setUploadProgress('Saving to browser storage...', 98);
         await new Promise(resolve => Module.FS.syncfs(false, resolve));
 
+        hasRCT2Files = true;
         showUploadSuccess('RCT2 files loaded successfully!');
-        startButton.style.display = 'block';
+        updateSetupScreen();
     } catch (e) {
         console.error('Error processing file:', e);
         showUploadError(`Error: ${e.message}`);
+        downloadRCT2Button.disabled = false;
+        startButton.disabled = !hasRCT2Files;
     }
 }
 
@@ -230,15 +469,12 @@ async function main() {
     const loaded = await loadWasmModule();
     if (!loaded) return;
 
-    if (fileExists('/RCT/Data/ch.dat')) {
-        loadingScreen.style.display = 'none';
-        startGame();
-    } else {
-        loadingScreen.style.display = 'none';
-        setupScreen.style.display = 'block';
-    }
+    loadingScreen.style.display = 'none';
+    setupScreen.style.display = 'block';
+    updateSetupScreen();
 }
 
 rct2FilesInput.addEventListener('change', handleFileUpload);
+downloadRCT2Button.addEventListener('click', downloadFromArchive);
 startButton.addEventListener('click', startGame);
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', main) : main();

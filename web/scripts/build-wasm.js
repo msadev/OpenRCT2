@@ -480,10 +480,9 @@ function copyArtifacts() {
     }
   }
 
+  // Copy any .data files if they exist (preloaded data)
   if (existsSync(BUILD_WASM_DIR)) {
-    const dataFiles = readdirSync(BUILD_WASM_DIR).filter(f =>
-      f.endsWith('.data') || (f.startsWith('openrct2') && !artifacts.includes(f))
-    );
+    const dataFiles = readdirSync(BUILD_WASM_DIR).filter(f => f.endsWith('.data'));
     for (const file of dataFiles) {
       const src = join(BUILD_WASM_DIR, file);
       const dest = join(DIST_DIR, file);
@@ -492,6 +491,8 @@ function copyArtifacts() {
       copied++;
     }
   }
+
+  // Note: We don't copy openrct2-cli files as they're for headless/server use only
 
   // Note: We don't copy emscripten/static files (index.html, index.js) as we have our own frontend in src/
 
