@@ -243,6 +243,7 @@ async function buildDependencies(env) {
       'emcmake cmake ..',
       '-G Ninja',
       '-DCMAKE_BUILD_TYPE=Release',
+      '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
       '-DZSTD_BUILD_PROGRAMS=OFF',
       '-DZSTD_BUILD_TESTS=OFF',
       '-DZSTD_BUILD_SHARED=OFF'
@@ -283,33 +284,101 @@ async function buildDependencies(env) {
     console.log('libzip already built, skipping...');
   }
 
-  // Build speexdsp
+  // Build speexdsp (using CMake wrapper since autotools doesn't work on Windows)
   const speexdspDir = join(DEPS_DIR, 'speexdsp');
-  const speexdspLibPath = join(speexdspDir, 'libspeexdsp', '.libs', 'libspeexdsp.a');
+  const speexdspBuildDir = join(speexdspDir, 'build');
+  const speexdspLibPath = join(speexdspBuildDir, 'libspeexdsp.a');
   if (!existsSync(speexdspLibPath)) {
     console.log('\n--- Building speexdsp ---\n');
     if (!existsSync(speexdspDir)) {
       exec(`git clone --depth 1 --branch SpeexDSP-1.2.1 https://github.com/xiph/speexdsp.git "${speexdspDir}"`);
     }
-    exec('./autogen.sh', { cwd: speexdspDir, env, ignoreError: true });
+
+    // Create config.h for speexdsp
+    const configH = `
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define FLOATING_POINT 1
+#define USE_KISS_FFT 1
+#define EXPORT
+
+/* We're using Emscripten/WASM */
+#define HAVE_STDINT_H 1
+#define HAVE_STRING_H 1
+#define HAVE_STDLIB_H 1
+
+#endif /* CONFIG_H */
+`;
+    writeFileSync(join(speexdspDir, 'config.h'), configH);
+    writeFileSync(join(speexdspDir, 'libspeexdsp', 'config.h'), configH);
+
+    // Create speexdsp_config_types.h
+    const configTypesH = `
+#ifndef SPEEXDSP_CONFIG_TYPES_H
+#define SPEEXDSP_CONFIG_TYPES_H
+
+#include <stdint.h>
+
+typedef int16_t spx_int16_t;
+typedef uint16_t spx_uint16_t;
+typedef int32_t spx_int32_t;
+typedef uint32_t spx_uint32_t;
+
+#endif /* SPEEXDSP_CONFIG_TYPES_H */
+`;
+    writeFileSync(join(speexdspDir, 'include', 'speex', 'speexdsp_config_types.h'), configTypesH);
+
+    // Create a simple CMakeLists.txt for speexdsp
+    const speexdspCMake = `
+cmake_minimum_required(VERSION 3.10)
+project(speexdsp C)
+
+set(SPEEXDSP_SOURCES
+  libspeexdsp/resample.c
+  libspeexdsp/buffer.c
+  libspeexdsp/fftwrap.c
+  libspeexdsp/filterbank.c
+  libspeexdsp/jitter.c
+  libspeexdsp/kiss_fft.c
+  libspeexdsp/kiss_fftr.c
+  libspeexdsp/mdf.c
+  libspeexdsp/preprocess.c
+  libspeexdsp/scal.c
+  libspeexdsp/smallft.c
+)
+
+add_library(speexdsp STATIC \${SPEEXDSP_SOURCES})
+
+target_include_directories(speexdsp PUBLIC
+  \${CMAKE_CURRENT_SOURCE_DIR}
+  \${CMAKE_CURRENT_SOURCE_DIR}/include
+  \${CMAKE_CURRENT_SOURCE_DIR}/libspeexdsp
+)
+
+target_compile_definitions(speexdsp PRIVATE
+  HAVE_CONFIG_H=1
+)
+`;
+    writeFileSync(join(speexdspDir, 'CMakeLists.txt'), speexdspCMake);
+
+    mkdirSync(speexdspBuildDir, { recursive: true });
     exec([
-      'emconfigure ./configure',
-      '--disable-shared',
-      '--enable-static',
-      '--disable-examples'
-    ].join(' '), { cwd: speexdspDir, env });
-    exec('emmake make -j4', { cwd: speexdspDir, env });
+      'emcmake cmake ..',
+      '-G Ninja',
+      '-DCMAKE_BUILD_TYPE=Release'
+    ].join(' '), { cwd: speexdspBuildDir, env });
+    exec('ninja', { cwd: speexdspBuildDir, env });
   } else {
     console.log('speexdsp already built, skipping...');
   }
 
-  // nlohmann/json - header only
-  const jsonDir = join(DEPS_DIR, 'nlohmann');
-  const jsonHeader = join(jsonDir, 'json.hpp');
-  if (!existsSync(jsonHeader)) {
+  // nlohmann/json - clone the repo to get full include structure
+  const jsonDir = join(DEPS_DIR, 'nlohmann-json');
+  const jsonIncludeDir = join(jsonDir, 'include');
+  if (!existsSync(jsonIncludeDir)) {
     console.log('\n--- Downloading nlohmann/json ---\n');
-    mkdirSync(jsonDir, { recursive: true });
-    exec(`curl -L -o "${jsonHeader}" https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp`);
+    exec(`git clone --depth 1 --branch v3.11.3 https://github.com/nlohmann/json.git "${jsonDir}"`);
   } else {
     console.log('nlohmann/json already present, skipping...');
   }
@@ -319,9 +388,11 @@ async function buildDependencies(env) {
     zstdInclude: join(zstdDir, 'lib').replace(/\\/g, '/'),
     libzipLib: libzipLibPath.replace(/\\/g, '/'),
     libzipInclude: join(libzipDir, 'lib').replace(/\\/g, '/'),
+    libzipBuildInclude: join(libzipDir, 'build').replace(/\\/g, '/'),
     speexdspLib: speexdspLibPath.replace(/\\/g, '/'),
     speexdspInclude: join(speexdspDir, 'include').replace(/\\/g, '/'),
-    jsonInclude: DEPS_DIR.replace(/\\/g, '/')
+    speexdspBuildInclude: speexdspBuildDir.replace(/\\/g, '/'),
+    jsonInclude: join(jsonDir, 'include').replace(/\\/g, '/')
   };
 }
 
@@ -335,9 +406,10 @@ function buildWasm(env, depsPaths) {
     mkdirSync(BUILD_WASM_DIR, { recursive: true });
   }
 
-  const emscriptenFlags = '-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_LIBPNG=1 -pthread -O3';
+  const emscriptenFlags = `-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_LIBPNG=1 -sUSE_ICU=1 -pthread -O3 -fno-lto -I${depsPaths.jsonInclude}`;
   const emscriptenExportedFunctions = '_GetVersion,_main';
   const emscriptenLdFlags = [
+    '-fno-lto',
     '-Wno-pthreads-mem-growth',
     '-sSAFE_HEAP=0',
     '-sALLOW_MEMORY_GROWTH=1',
@@ -360,6 +432,7 @@ function buildWasm(env, depsPaths) {
     'emcmake cmake ..',
     '-G Ninja',
     '-DCMAKE_BUILD_TYPE=Release',
+    '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF',
     '-DDISABLE_NETWORK=ON',
     '-DDISABLE_OPENGL=ON',
     '-DDISABLE_HTTP=ON',
@@ -369,7 +442,7 @@ function buildWasm(env, depsPaths) {
     `-DSPEEXDSP_INCLUDE_DIR="${depsPaths.speexdspInclude}"`,
     `-DSPEEXDSP_LIBRARY="${depsPaths.speexdspLib}"`,
     `-DLIBZIP_LIBRARIES="${depsPaths.libzipLib}"`,
-    `-DLIBZIP_INCLUDE_DIRS="${depsPaths.libzipInclude}"`,
+    `-DLIBZIP_INCLUDE_DIRS="${depsPaths.libzipInclude};${depsPaths.libzipBuildInclude}"`,
     `-DZSTD_LIBRARIES="${depsPaths.zstdLib}"`,
     `-DZSTD_INCLUDE_DIRS="${depsPaths.zstdInclude}"`,
     `-DEMSCRIPTEN_FLAGS="${emscriptenFlags}"`,
@@ -420,16 +493,7 @@ function copyArtifacts() {
     }
   }
 
-  const emscriptenStatic = join(ROOT_DIR, 'emscripten', 'static');
-  if (existsSync(emscriptenStatic)) {
-    const staticFiles = readdirSync(emscriptenStatic);
-    for (const file of staticFiles) {
-      const src = join(emscriptenStatic, file);
-      const dest = join(DIST_DIR, file);
-      console.log(`Copying static/${file}...`);
-      copyFileSync(src, dest);
-    }
-  }
+  // Note: We don't copy emscripten/static files (index.html, index.js) as we have our own frontend in src/
 
   if (copied > 0) {
     console.log(`\n${copied} file(s) copied to web/static/`);
@@ -542,9 +606,10 @@ async function main() {
       zstdInclude: join(DEPS_DIR, 'zstd', 'lib').replace(/\\/g, '/'),
       libzipLib: join(DEPS_DIR, 'libzip', 'build', 'lib', 'libzip.a').replace(/\\/g, '/'),
       libzipInclude: join(DEPS_DIR, 'libzip', 'lib').replace(/\\/g, '/'),
-      speexdspLib: join(DEPS_DIR, 'speexdsp', 'libspeexdsp', '.libs', 'libspeexdsp.a').replace(/\\/g, '/'),
+      libzipBuildInclude: join(DEPS_DIR, 'libzip', 'build').replace(/\\/g, '/'),
+      speexdspLib: join(DEPS_DIR, 'speexdsp', 'build', 'libspeexdsp.a').replace(/\\/g, '/'),
       speexdspInclude: join(DEPS_DIR, 'speexdsp', 'include').replace(/\\/g, '/'),
-      jsonInclude: DEPS_DIR.replace(/\\/g, '/')
+      jsonInclude: join(DEPS_DIR, 'nlohmann-json', 'include').replace(/\\/g, '/')
     };
   }
 

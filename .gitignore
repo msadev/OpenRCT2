@@ -20,6 +20,8 @@ bin.*/
 sequencesversion
 objectsversion
 /out/
+build-wasm/
+build-wasm-deps/
 
 #lib
 lib

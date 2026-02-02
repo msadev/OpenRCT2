@@ -97,7 +97,11 @@ async function loadWasmModule() {
         await new Promise(resolve => Module.FS.syncfs(true, resolve));
 
         setStatus('Checking assets...', 90);
-        await updateAssets();
+        try {
+            await updateAssets();
+        } catch (e) {
+            console.warn('Asset update skipped:', e);
+        }
 
         setStatus('Ready!', 100);
         return true;
@@ -118,11 +122,22 @@ async function updateAssets() {
     if (currentVersion !== assetsVersion || assetsVersion.includes('DEBUG')) {
         try {
             const response = await fetch('assets.zip');
-            if (response.ok) {
-                await extractZip(await response.blob(), '/OpenRCT2/');
-                Module.FS.writeFile('/OpenRCT2/version', assetsVersion);
+            const contentType = response.headers.get('content-type') || '';
+            // Only try to extract if it's actually a zip file (not HTML error page)
+            if (response.ok && !contentType.includes('text/html')) {
+                const blob = await response.blob();
+                // Check for ZIP magic number (PK)
+                const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+                if (header[0] === 0x50 && header[1] === 0x4B) {
+                    await extractZip(blob, '/OpenRCT2/');
+                    Module.FS.writeFile('/OpenRCT2/version', assetsVersion);
+                } else {
+                    console.log('assets.zip not found or not a valid ZIP file');
+                }
+            } else {
+                console.log('assets.zip not available (this is OK)');
             }
-        } catch (e) { console.warn('Could not update assets:', e); }
+        } catch (e) { console.warn('Could not update assets (this is OK if assets.zip does not exist):', e); }
     }
 }
 
