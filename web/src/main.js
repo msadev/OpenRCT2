@@ -115,29 +115,48 @@ async function loadWasmModule() {
 async function updateAssets() {
     let currentVersion = '';
     try { currentVersion = Module.FS.readFile('/OpenRCT2/version', { encoding: 'utf8' }); } catch {}
+    console.log('Current asset version:', currentVersion || '(none)');
 
     let assetsVersion = 'DEBUG';
     try { assetsVersion = Module.ccall('GetVersion', 'string'); } catch {}
+    console.log('Target asset version:', assetsVersion);
 
-    if (currentVersion !== assetsVersion || assetsVersion.includes('DEBUG')) {
+    // Check if g2.dat exists - if not, force re-extraction
+    let hasG2 = false;
+    try { Module.FS.readFile('/OpenRCT2/g2.dat'); hasG2 = true; } catch {}
+
+    if (currentVersion !== assetsVersion || assetsVersion.includes('DEBUG') || !hasG2) {
+        console.log('Re-extracting assets (g2.dat exists:', hasG2, ')');
+        console.log('Updating assets...');
         try {
             const response = await fetch('assets.zip');
+            console.log('assets.zip fetch response:', response.status, response.headers.get('content-type'));
             const contentType = response.headers.get('content-type') || '';
             // Only try to extract if it's actually a zip file (not HTML error page)
             if (response.ok && !contentType.includes('text/html')) {
                 const blob = await response.blob();
+                console.log('assets.zip size:', blob.size);
                 // Check for ZIP magic number (PK)
                 const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
                 if (header[0] === 0x50 && header[1] === 0x4B) {
+                    console.log('Extracting assets.zip...');
                     await extractZip(blob, '/OpenRCT2/');
                     Module.FS.writeFile('/OpenRCT2/version', assetsVersion);
+                    console.log('Assets extracted successfully');
+                    // Debug: list contents of /OpenRCT2/
+                    try {
+                        const contents = Module.FS.readdir('/OpenRCT2/');
+                        console.log('/OpenRCT2/ contents:', contents);
+                    } catch (e) { console.log('Could not list /OpenRCT2/:', e); }
                 } else {
-                    console.log('assets.zip not found or not a valid ZIP file');
+                    console.log('assets.zip not found or not a valid ZIP file (magic:', header[0], header[1], ')');
                 }
             } else {
                 console.log('assets.zip not available (this is OK)');
             }
-        } catch (e) { console.warn('Could not update assets (this is OK if assets.zip does not exist):', e); }
+        } catch (e) { console.warn('Could not update assets:', e); }
+    } else {
+        console.log('Assets are up to date');
     }
 }
 
@@ -145,10 +164,19 @@ async function extractZip(data, basePath) {
     const zip = new JSZip();
     const contents = await zip.loadAsync(data);
     for (const [path, entry] of Object.entries(contents.files)) {
-        const fullPath = basePath + path;
+        // Convert Windows backslashes to forward slashes
+        const normalizedPath = path.replace(/\\/g, '/');
+        const fullPath = basePath + normalizedPath;
         if (entry.dir) {
             try { Module.FS.mkdir(fullPath); } catch {}
         } else {
+            // Create parent directories if needed
+            const parts = fullPath.split('/').filter(Boolean);
+            let currentPath = '';
+            for (let i = 0; i < parts.length - 1; i++) {
+                currentPath += '/' + parts[i];
+                try { Module.FS.mkdir(currentPath); } catch {}
+            }
             Module.FS.writeFile(fullPath, await entry.async('uint8array'));
         }
     }
