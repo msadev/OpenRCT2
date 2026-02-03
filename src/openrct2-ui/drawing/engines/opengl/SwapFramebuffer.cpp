@@ -31,7 +31,10 @@ SwapFramebuffer::SwapFramebuffer(int32_t width, int32_t height)
 
 SwapFramebuffer::~SwapFramebuffer()
 {
-    glCall(glDeleteTextures, 1, &_backDepth);
+    if (OpenGLState::ContextValid)
+    {
+        glCall(glDeleteTextures, 1, &_backDepth);
+    }
 }
 
 void SwapFramebuffer::ApplyTransparency(ApplyTransparencyShader& shader, GLuint paletteTex, GLuint blendPaletteTex)

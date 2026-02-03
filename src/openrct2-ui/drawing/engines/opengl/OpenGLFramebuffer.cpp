@@ -119,7 +119,7 @@ OpenGLFramebuffer::OpenGLFramebuffer(int32_t width, int32_t height, bool depth, 
 
 OpenGLFramebuffer::~OpenGLFramebuffer()
 {
-    if (_id != kBackBufferID)
+    if (_id != kBackBufferID && OpenGLState::ContextValid)
     {
         glCall(glDeleteTextures, 1, &_texture);
         glCall(glDeleteTextures, 1, &_depth);

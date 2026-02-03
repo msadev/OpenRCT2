@@ -241,6 +241,9 @@ public:
 
     ~OpenGLDrawingEngine() override
     {
+        // Mark the context as invalid before destroying resources
+        // This prevents destructors from making GL calls after context is lost
+        OpenGLState::Invalidate();
         SDL_GL_DeleteContext(_context);
     }
 

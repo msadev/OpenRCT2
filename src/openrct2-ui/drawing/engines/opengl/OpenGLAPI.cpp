@@ -44,11 +44,18 @@ namespace OpenRCT2::Ui::OpenGLState
 {
     uint16_t ActiveTexture;
     GLuint CurrentProgram;
+    bool ContextValid = false;
 
     void Reset()
     {
         ActiveTexture = UINT16_MAX;
         CurrentProgram = UINT32_MAX;
+        ContextValid = true;
+    }
+
+    void Invalidate()
+    {
+        ContextValid = false;
     }
 } // namespace OpenRCT2::Ui::OpenGLState
 

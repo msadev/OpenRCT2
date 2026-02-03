@@ -48,7 +48,10 @@ OpenGLShader::OpenGLShader(const char* name, GLenum type)
 
 OpenGLShader::~OpenGLShader()
 {
-    glCall(glDeleteShader, _id);
+    if (OpenGLState::ContextValid)
+    {
+        glCall(glDeleteShader, _id);
+    }
 }
 
 GLuint OpenGLShader::GetShaderId()
@@ -115,15 +118,18 @@ OpenGLShaderProgram::OpenGLShaderProgram(const char* name)
 
 OpenGLShaderProgram::~OpenGLShaderProgram()
 {
-    if (_vertexShader != nullptr)
+    if (OpenGLState::ContextValid)
     {
-        glCall(glDetachShader, _id, _vertexShader->GetShaderId());
+        if (_vertexShader != nullptr)
+        {
+            glCall(glDetachShader, _id, _vertexShader->GetShaderId());
+        }
+        if (_fragmentShader != nullptr)
+        {
+            glCall(glDetachShader, _id, _fragmentShader->GetShaderId());
+        }
+        glCall(glDeleteProgram, _id);
     }
-    if (_fragmentShader != nullptr)
-    {
-        glCall(glDetachShader, _id, _fragmentShader->GetShaderId());
-    }
-    glCall(glDeleteProgram, _id);
 }
 
 GLint OpenGLShaderProgram::GetAttributeLocation(const char* name)

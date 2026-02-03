@@ -725,7 +725,15 @@ void GameLoadOrQuitNoSavePrompt()
 #endif
 
             auto* context = GetContext();
-            context->SetActiveScene(context->GetTitleScene());
+            // If already on title screen, actually quit the application
+            if (gLegacyScene == LegacyScene::titleSequence)
+            {
+                context->Finish();
+            }
+            else
+            {
+                context->SetActiveScene(context->GetTitleScene());
+            }
             break;
         }
         case PromptMode::saveBeforeNewGame:

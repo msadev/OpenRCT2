@@ -216,7 +216,9 @@ namespace OpenRCT2::Ui
     {
         extern uint16_t ActiveTexture;
         extern GLuint CurrentProgram;
+        extern bool ContextValid;
 
         void Reset();
+        void Invalidate();
     } // namespace OpenGLState
 } // namespace OpenRCT2::Ui

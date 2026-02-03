@@ -152,10 +152,13 @@ DrawRectShader::DrawRectShader()
 
 DrawRectShader::~DrawRectShader()
 {
-    glCall(glDeleteBuffers, 1, &_vbo);
-    glCall(glDeleteBuffers, 1, &_vboInstances);
-    glCall(glDeleteVertexArrays, 1, &_vao);
-    glCall(glDeleteTextures, 1, &_dummyDepthTexture);
+    if (OpenGLState::ContextValid)
+    {
+        glCall(glDeleteBuffers, 1, &_vbo);
+        glCall(glDeleteBuffers, 1, &_vboInstances);
+        glCall(glDeleteVertexArrays, 1, &_vao);
+        glCall(glDeleteTextures, 1, &_dummyDepthTexture);
+    }
 }
 
 void DrawRectShader::GetLocations()

@@ -57,8 +57,11 @@ CopyRectShader::CopyRectShader()
 
 CopyRectShader::~CopyRectShader()
 {
-    glCall(glDeleteBuffers, 1, &_vbo);
-    glCall(glDeleteVertexArrays, 1, &_vao);
+    if (OpenGLState::ContextValid)
+    {
+        glCall(glDeleteBuffers, 1, &_vbo);
+        glCall(glDeleteVertexArrays, 1, &_vao);
+    }
 }
 
 void CopyRectShader::GetLocations()

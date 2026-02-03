@@ -1252,6 +1252,11 @@ namespace OpenRCT2
                     if (ctx->_finished)
                     {
                         emscripten_cancel_main_loop();
+                        // Reload the page when quitting on web
+                        EM_ASM({
+                            window.location.reload();
+                        });
+                        return;
                     }
                     ctx->RunFrame();
                 },
