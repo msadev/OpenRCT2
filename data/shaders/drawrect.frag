@@ -1,4 +1,8 @@
-#version 330 core
+#version 300 es
+precision highp float;
+precision highp int;
+precision highp usampler2DArray;
+precision highp usampler2D;
 
 // clang-format off
 const int MASK_REMAP_COUNT          = 3;
@@ -12,8 +16,6 @@ uniform usampler2D      uPaletteTex;
 
 uniform sampler2D       uPeelingTex;
 uniform bool            uPeeling;
-
-in vec4 gl_FragCoord;
 
 flat in int             fFlags;
 flat in uint            fColour;
@@ -29,7 +31,7 @@ flat in int             fTexMaskAtlas;
 flat in int             fScreenHeight;
 // clang-format on
 
-out uint oColour;
+layout(location = 0) out uint oColour;
 
 void main()
 {
@@ -42,7 +44,7 @@ void main()
         }
     }
 
-    vec2 fragCoord = vec2(floor(gl_FragCoord.x), fScreenHeight - floor(gl_FragCoord.y) - 1);
+    vec2 fragCoord = vec2(floor(gl_FragCoord.x), float(fScreenHeight) - floor(gl_FragCoord.y) - 1.0);
     vec2 position = (fragCoord - fPosition) * fZoom;
 
     uint texel;
@@ -50,7 +52,7 @@ void main()
     {
         float colourU = (fTexColour.x + position.x) / fTexColour.z;
         float colourV = (fTexColour.y + position.y) / fTexColour.w;
-        texel = texture(uTexture, vec3(colourU, colourV, fTexColourAtlas)).r;
+        texel = texture(uTexture, vec3(colourU, colourV, float(fTexColourAtlas))).r;
         if (texel == 0u)
         {
             discard;
@@ -86,15 +88,15 @@ void main()
     int paletteCount = fFlags & MASK_REMAP_COUNT;
     if (paletteCount >= 3 && texel >= 0x2Eu && texel < 0x3Au)
     {
-        texel = texture(uPaletteTex, vec2(texel + 0xC5u, fPalettes.z) / 256.0f).r;
+        texel = texture(uPaletteTex, vec2(float(texel + 0xC5u), fPalettes.z) / 256.0).r;
     }
     else if (paletteCount >= 2 && texel >= 0xCAu && texel < 0xD6u)
     {
-        texel = texture(uPaletteTex, vec2(texel + 0x29u, fPalettes.y) / 256.f).r;
+        texel = texture(uPaletteTex, vec2(float(texel + 0x29u), fPalettes.y) / 256.0).r;
     }
     else if (paletteCount >= 1)
     {
-        texel = texture(uPaletteTex, vec2(texel, fPalettes.x) / 256.f).r;
+        texel = texture(uPaletteTex, vec2(float(texel), fPalettes.x) / 256.0).r;
     }
 
     if (texel == 0u)
@@ -105,7 +107,7 @@ void main()
     if ((fFlags & FLAG_CROSS_HATCH) != 0)
     {
         int posSum = int(position.x) + int(position.y);
-        if ((posSum % 2) != 0)
+        if ((posSum - (posSum / 2) * 2) != 0)
         {
             discard;
         }
@@ -115,7 +117,7 @@ void main()
     {
         float maskU = (fTexMask.x + position.x) / fTexMask.z;
         float maskV = (fTexMask.y + position.y) / fTexMask.w;
-        uint mask = texture(uTexture, vec3(maskU, maskV, fTexMaskAtlas)).r;
+        uint mask = texture(uTexture, vec3(maskU, maskV, float(fTexMaskAtlas))).r;
         if (mask == 0u)
         {
             discard;

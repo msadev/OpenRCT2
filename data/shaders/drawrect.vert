@@ -1,4 +1,6 @@
-#version 330 core
+#version 300 es
+precision highp float;
+precision highp int;
 
 // Allows for about 8 million draws per frame
 const float DEPTH_INCREMENT = 1.0 / float(1u << 22u);
@@ -43,7 +45,7 @@ void main()
     fTexColour = vTexColourCoords;
     fTexMask = vTexMaskCoords;
 
-    fPosition = vBounds.xy;
+    fPosition = vec2(vBounds.xy);
     fZoom = vZoom;
     fTexColourAtlas = vTexColourAtlas;
     fTexMaskAtlas = vTexMaskAtlas;

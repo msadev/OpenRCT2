@@ -16,7 +16,12 @@
 #include <type_traits>
 #include <utility>
 
-#ifdef OPENGL_NO_LINK
+#ifdef __EMSCRIPTEN__
+    #include <GLES3/gl3.h>
+    #include <GLES3/gl2ext.h>
+    // WebGL2/GLES3 uses glClearDepthf instead of glClearDepth
+    #define glClearDepth glClearDepthf
+#elif defined(OPENGL_NO_LINK)
 
     // BEGIN [Do not define 1.1 function signatures]
     #define glActiveTexture __static__glActiveTexture
@@ -54,11 +59,13 @@
 
 #endif
 
+#ifndef __EMSCRIPTEN__
 #include <SDL_opengl.h>
 // OpenRCT2: SDL_opengl.h includes windows.h, which defines some macros that can cause conflicts
 #undef CreateWindow
 #undef CreateDirectory
 #undef GetMessage
+#endif
 
 #ifdef OPENGL_NO_LINK
 

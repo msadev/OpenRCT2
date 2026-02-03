@@ -1,11 +1,14 @@
-#version 330 core
+#version 300 es
+precision highp float;
+precision highp int;
+precision highp usampler2D;
 
 in vec2 fTextureCoordinate;
-out vec4 fragColor;
+layout(location = 0) out uint oColour;
 
-uniform sampler2D uTexture;
+uniform usampler2D uTexture;
 
 void main()
 {
-    fragColor = texture(uTexture, fTextureCoordinate);
+    oColour = texture(uTexture, fTextureCoordinate).r;
 }

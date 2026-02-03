@@ -44,6 +44,7 @@ namespace OpenRCT2::Ui
         GLuint _vbo{ 0 };
         GLuint _vboInstances{ 0 };
         GLuint _vao{ 0 };
+        GLuint _dummyDepthTexture{ 0 };
 
         GLsizei _instanceCount = 0;
         size_t _maxInstancesBufferSize;

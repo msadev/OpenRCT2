@@ -135,6 +135,19 @@ DrawRectShader::DrawRectShader()
 
     glCall(glUniform1i, uPeelingTex, 2);
     glCall(glUniform1i, uPeeling, 0);
+
+    // Create a dummy float texture for uPeelingTex to satisfy WebGL2 validation
+    // when peeling is disabled but the sampler still needs a valid texture bound
+    glCall(glGenTextures, 1, &_dummyDepthTexture);
+    glCall(glBindTexture, GL_TEXTURE_2D, _dummyDepthTexture);
+    glCall(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glCall(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glCall(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glCall(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // Use RGBA8 which is universally supported (sampler2D reads as float)
+    glCall(glTexImage2D, GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    // Bind to texture unit 2 as default
+    OpenGLAPI::SetTexture(2, GL_TEXTURE_2D, _dummyDepthTexture);
 }
 
 DrawRectShader::~DrawRectShader()
@@ -142,6 +155,7 @@ DrawRectShader::~DrawRectShader()
     glCall(glDeleteBuffers, 1, &_vbo);
     glCall(glDeleteBuffers, 1, &_vboInstances);
     glCall(glDeleteVertexArrays, 1, &_vao);
+    glCall(glDeleteTextures, 1, &_dummyDepthTexture);
 }
 
 void DrawRectShader::GetLocations()
@@ -182,6 +196,7 @@ void DrawRectShader::EnablePeeling(GLuint peelingTex)
 
 void DrawRectShader::DisablePeeling()
 {
+    OpenGLAPI::SetTexture(2, GL_TEXTURE_2D, _dummyDepthTexture);
     glCall(glUniform1i, uPeeling, 0);
 }
 

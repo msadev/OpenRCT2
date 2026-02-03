@@ -11,7 +11,7 @@
 
     #include "OpenGLAPI.h"
 
-    #if OPENGL_NO_LINK
+    #ifdef OPENGL_NO_LINK
 
         #define OPENGL_PROC(TYPE, PROC) TYPE PROC = nullptr;
         #include "OpenGLAPIProc.h"
@@ -36,7 +36,7 @@ static const char* TryLoadAllProcAddresses()
     return nullptr;
 }
 
-    #endif /* #if OPENGL_NO_LINK */
+    #endif /* #ifdef OPENGL_NO_LINK */
 
 using namespace OpenRCT2::Ui;
 

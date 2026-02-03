@@ -25,6 +25,7 @@ namespace OpenRCT2::Ui
         GLuint _depth;
         int32_t _width;
         int32_t _height;
+        bool _isInteger = false;
 
     public:
         explicit OpenGLFramebuffer(SDL_Window* window);

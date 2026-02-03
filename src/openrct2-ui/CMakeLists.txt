@@ -36,9 +36,12 @@ else ()
     endif ()
 endif ()
 
-if (NOT DISABLE_OPENGL AND NOT EMSCRIPTEN)
-    # GL doesn't work nicely with macOS, while find_package doesn't work with multiarch on Ubuntu.
-    if (APPLE OR HAIKU)
+if (NOT DISABLE_OPENGL)
+    if (EMSCRIPTEN)
+        # WebGL2 is provided by Emscripten, no need to find OpenGL
+        message(STATUS "OpenGL/WebGL2 support enabled for Emscripten")
+    elseif (APPLE OR HAIKU)
+        # GL doesn't work nicely with macOS, while find_package doesn't work with multiarch on Ubuntu.
         find_package(OpenGL REQUIRED)
     elseif (NOT WIN32)
         PKG_CHECK_MODULES(GL REQUIRED gl)
@@ -98,7 +101,9 @@ if (NOT DISABLE_VORBIS)
 endif ()
 
 if (NOT DISABLE_OPENGL)
-    if (WIN32)
+    if (EMSCRIPTEN)
+        # WebGL2 is linked automatically by Emscripten
+    elseif (WIN32)
         target_link_libraries(openrct2 opengl32)
     elseif (APPLE OR HAIKU)
         target_link_libraries(openrct2 ${OPENGL_LIBRARY})
@@ -152,7 +157,8 @@ target_compile_definitions(openrct2 PUBLIC
     $<$<BOOL:${DISABLE_VORBIS}>:DISABLE_VORBIS>
     # If OpenGL is enabled then we want to dynamically look up symbols.
     # If its disabled and somehow we magically end up linking to OpenGL we don't want look up the OpenGL symbols????
-    $<IF:$<BOOL:${DISABLE_OPENGL}>,DISABLE_OPENGL,OPENGL_NO_LINK>
+    # For Emscripten, we use OpenGL ES 3.0 directly without dynamic linking
+    $<IF:$<BOOL:${DISABLE_OPENGL}>,DISABLE_OPENGL,$<IF:$<BOOL:${EMSCRIPTEN}>,,OPENGL_NO_LINK>>
 )
 
 if (MSVC)

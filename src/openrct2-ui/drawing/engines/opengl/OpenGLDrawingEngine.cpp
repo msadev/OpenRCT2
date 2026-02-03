@@ -50,7 +50,12 @@ struct OpenGLVersion
     GLint Minor;
 };
 
+#ifdef __EMSCRIPTEN__
+// WebGL2 maps to OpenGL ES 3.0
+constexpr OpenGLVersion kOpenGLMinimumRequiredVersion = { 3, 0 };
+#else
 constexpr OpenGLVersion kOpenGLMinimumRequiredVersion = { 3, 3 };
+#endif
 
 constexpr uint8_t kCSInside = 0b0000;
 constexpr uint8_t kCSLeft = 0b0001;
@@ -244,13 +249,22 @@ public:
         OpenGLVersion requiredVersion = kOpenGLMinimumRequiredVersion;
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, requiredVersion.Major);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, requiredVersion.Minor);
+#ifdef __EMSCRIPTEN__
+        // Request OpenGL ES 3.0 context for WebGL2
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#endif
 
         _context = SDL_GL_CreateContext(_window);
         if (_context == nullptr)
         {
             char szRequiredVersion[32];
+#ifdef __EMSCRIPTEN__
+            snprintf(szRequiredVersion, 32, "WebGL2 (OpenGL ES %d.%d)", requiredVersion.Major, requiredVersion.Minor);
+#else
             snprintf(szRequiredVersion, 32, "OpenGL %d.%d", requiredVersion.Major, requiredVersion.Minor);
+#endif
             throw std::runtime_error(std::string(szRequiredVersion) + std::string(" not available."));
         }
         SDL_GL_MakeCurrent(_window, _context);
@@ -638,6 +652,7 @@ OpenGLDrawingContext::~OpenGLDrawingContext()
 void OpenGLDrawingContext::Initialise()
 {
     _textureCache = std::make_unique<TextureCache>();
+    _textureCache->Initialise();
     _applyTransparencyShader = std::make_unique<ApplyTransparencyShader>();
     _drawRectShader = std::make_unique<DrawRectShader>();
     _drawLineShader = std::make_unique<DrawLineShader>();

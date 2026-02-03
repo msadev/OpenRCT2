@@ -1,8 +1,10 @@
-#version 330 core
+#version 300 es
+precision highp float;
+precision highp int;
 
 flat in uint fColour;
 
-out uint oColour;
+layout(location = 0) out uint oColour;
 
 void main()
 {

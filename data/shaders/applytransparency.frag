@@ -1,4 +1,6 @@
-#version 330 core
+#version 300 es
+precision highp float;
+precision highp usampler2D;
 
 // clang-format off
 uniform usampler2D      uOpaqueTex;
@@ -11,7 +13,7 @@ uniform usampler2D      uBlendPaletteTex;
 
 in vec2 fTextureCoordinate;
 
-out uint oColour;
+layout(location = 0) out uint oColour;
 
 void main()
 {
@@ -34,11 +36,11 @@ void main()
         }
         else
         {
-            oColour = texture(uBlendPaletteTex, vec2(opaque, blendColour) / 256.f).r;
+            oColour = texture(uBlendPaletteTex, vec2(opaque, blendColour) / 256.0).r;
         }
     }
     else
     {
-        oColour = texture(uPaletteTex, vec2(opaque, transparent) / 256.f).r;
+        oColour = texture(uPaletteTex, vec2(opaque, transparent) / 256.0).r;
     }
 }

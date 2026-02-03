@@ -206,6 +206,7 @@ namespace OpenRCT2::Ui
     public:
         TextureCache();
         ~TextureCache();
+        void Initialise();
         void InvalidateImage(ImageIndex image);
         BasicTextureInfo GetOrLoadImageTexture(ImageId imageId);
         BasicTextureInfo GetOrLoadGlyphTexture(ImageId imageId, const PaletteMap& paletteMap);

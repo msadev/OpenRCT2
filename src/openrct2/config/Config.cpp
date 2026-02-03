@@ -211,8 +211,14 @@ namespace OpenRCT2::Config
             model->windowSnapProximity = reader->GetInt32("window_snap_proximity", 5);
             model->windowWidth = reader->GetInt32("window_width", -1);
             model->defaultDisplay = reader->GetInt32("default_display", 0);
+#ifdef __EMSCRIPTEN__
+            // WebGL2 provides better performance for the web version
+            model->drawingEngine = reader->GetEnum<DrawingEngine>(
+                "drawing_engine", DrawingEngine::OpenGL, Enum_DrawingEngine);
+#else
             model->drawingEngine = reader->GetEnum<DrawingEngine>(
                 "drawing_engine", DrawingEngine::SoftwareWithHardwareDisplay, Enum_DrawingEngine);
+#endif
             model->uncapFPS = reader->GetBoolean("uncap_fps", false);
             model->useVSync = reader->GetBoolean("use_vsync", true);
             model->virtualFloorStyle = reader->GetEnum<VirtualFloorStyles>(

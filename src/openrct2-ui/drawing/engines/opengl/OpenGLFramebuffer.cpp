@@ -32,6 +32,7 @@ OpenGLFramebuffer::OpenGLFramebuffer(int32_t width, int32_t height, bool depth, 
 {
     _width = width;
     _height = height;
+    _isInteger = integer;
 
     glCall(glGenTextures, 1, &_texture);
     glCall(glBindTexture, GL_TEXTURE_2D, _texture);
@@ -95,16 +96,22 @@ OpenGLFramebuffer::OpenGLFramebuffer(int32_t width, int32_t height, bool depth, 
     glCall(glDrawBuffers, 1, drawBuffers);
 
     // Clear the framebuffer.
-    glCall(glClearColor, 0, 0, 0, 0);
+    // For integer framebuffers, we must use glClearBufferuiv instead of glClearColor + glClear
+    if (_isInteger)
+    {
+        const GLuint clearValue[4] = { 0, 0, 0, 0 };
+        glCall(glClearBufferuiv, GL_COLOR, 0, clearValue);
+    }
+    else
+    {
+        glCall(glClearColor, 0, 0, 0, 0);
+        glCall(glClear, GL_COLOR_BUFFER_BIT);
+    }
 
     if (depth)
     {
         glCall(glClearDepth, 1.0f);
-        glCall(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-    else
-    {
-        glCall(glClear, GL_COLOR_BUFFER_BIT);
+        glCall(glClear, GL_DEPTH_BUFFER_BIT);
     }
 
     glCall(glBindFramebuffer, GL_FRAMEBUFFER, 0);
@@ -185,9 +192,15 @@ void OpenGLFramebuffer::GetPixels(Drawing::RenderTarget& rt) const
     assert(rt.width == _width && rt.height == _height);
 
     auto pixels = std::make_unique<uint8_t[]>(_width * _height);
-    glCall(glBindTexture, GL_TEXTURE_2D, _texture);
     glCall(glPixelStorei, GL_PACK_ALIGNMENT, 1);
+#ifdef __EMSCRIPTEN__
+    // WebGL2 doesn't have glGetTexImage, use glReadPixels instead
+    glCall(glBindFramebuffer, GL_FRAMEBUFFER, _id);
+    glCall(glReadPixels, 0, 0, _width, _height, GL_RED_INTEGER, GL_UNSIGNED_BYTE, pixels.get());
+#else
+    glCall(glBindTexture, GL_TEXTURE_2D, _texture);
     glCall(glGetTexImage, GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, pixels.get());
+#endif
 
     // Flip pixels vertically on copy
     uint8_t* src = pixels.get() + ((_height - 1) * _width);

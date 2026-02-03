@@ -35,6 +35,11 @@ TextureCache::~TextureCache()
     FreeTextures();
 }
 
+void TextureCache::Initialise()
+{
+    CreateTextures();
+}
+
 void TextureCache::InvalidateImage(ImageIndex image)
 {
     uint32_t index = _indexMap[image];
@@ -175,7 +180,14 @@ void TextureCache::CreateTextures()
         glCall(glBindTexture, GL_TEXTURE_2D_ARRAY, _atlasesTexture);
         glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glCall(glPixelStorei, GL_UNPACK_ALIGNMENT, 1);
+        // Allocate initial texture storage (required by WebGL2)
+        glCall(
+            glTexImage3D, GL_TEXTURE_2D_ARRAY, 0, GL_R8UI, _atlasesTextureDimensions, _atlasesTextureDimensions,
+            1, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, nullptr);
+        _atlasesTextureCapacity = 1;
 
         glCall(glGenTextures, 1, &_paletteTexture);
         glCall(glBindTexture, GL_TEXTURE_2D, _paletteTexture);
@@ -199,7 +211,7 @@ void TextureCache::CreateTextures()
 
         _initialized = true;
         _atlasesTextureIndices = 0;
-        _atlasesTextureCapacity = 0;
+        // _atlasesTextureCapacity is already set to 1 above
     }
 }
 
@@ -243,31 +255,67 @@ void TextureCache::EnlargeAtlasesTexture(GLuint newEntries)
 
     GLuint newIndices = _atlasesTextureIndices + newEntries;
 
-    std::vector<char> oldPixels;
-
     if (newIndices > _atlasesTextureCapacity)
     {
-        // Retrieve current array data, growing buffer.
-        oldPixels.resize(_atlasesTextureDimensions * _atlasesTextureDimensions * _atlasesTextureCapacity);
-        if (!oldPixels.empty())
-        {
-            glCall(glGetTexImage, GL_TEXTURE_2D_ARRAY, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, oldPixels.data());
-        }
+        GLuint oldCapacity = _atlasesTextureCapacity;
+        GLuint oldTexture = _atlasesTexture;
 
         // Initial capacity will be 12 which covers most cases of a fully visible park.
         _atlasesTextureCapacity = (_atlasesTextureCapacity + 6) << 1uL;
 
+        // Create new larger texture
+        glCall(glGenTextures, 1, &_atlasesTexture);
         glCall(glBindTexture, GL_TEXTURE_2D_ARRAY, _atlasesTexture);
         glCall(
             glTexImage3D, GL_TEXTURE_2D_ARRAY, 0, GL_R8UI, _atlasesTextureDimensions, _atlasesTextureDimensions,
             _atlasesTextureCapacity, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, nullptr);
+        glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glCall(glTexParameteri, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        // Restore old data
-        if (!oldPixels.empty())
+#ifdef __EMSCRIPTEN__
+        // WebGL2 doesn't have glGetTexImage, use glCopyTexSubImage3D with framebuffer
+        if (oldCapacity > 0 && _atlasesTextureIndices > 0)
         {
+            GLuint copyFbo;
+            glCall(glGenFramebuffers, 1, &copyFbo);
+
+            for (GLuint i = 0; i < _atlasesTextureIndices; i++)
+            {
+                // Bind old texture layer to framebuffer for reading
+                glCall(glBindFramebuffer, GL_READ_FRAMEBUFFER, copyFbo);
+                glCall(glFramebufferTextureLayer, GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, oldTexture, 0, i);
+
+                // Copy to new texture
+                glCall(glBindTexture, GL_TEXTURE_2D_ARRAY, _atlasesTexture);
+                glCall(glCopyTexSubImage3D, GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 0, 0, _atlasesTextureDimensions, _atlasesTextureDimensions);
+            }
+
+            glCall(glBindFramebuffer, GL_READ_FRAMEBUFFER, 0);
+            glCall(glDeleteFramebuffers, 1, &copyFbo);
+        }
+#else
+        // Desktop OpenGL: use glGetTexImage to copy data
+        if (oldCapacity > 0 && _atlasesTextureIndices > 0)
+        {
+            std::vector<char> oldPixels;
+            oldPixels.resize(_atlasesTextureDimensions * _atlasesTextureDimensions * oldCapacity);
+
+            glCall(glBindTexture, GL_TEXTURE_2D_ARRAY, oldTexture);
+            glCall(glGetTexImage, GL_TEXTURE_2D_ARRAY, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, oldPixels.data());
+
+            glCall(glBindTexture, GL_TEXTURE_2D_ARRAY, _atlasesTexture);
             glCall(
                 glTexSubImage3D, GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, _atlasesTextureDimensions, _atlasesTextureDimensions,
                 _atlasesTextureIndices, GL_RED_INTEGER, GL_UNSIGNED_BYTE, oldPixels.data());
+        }
+#endif
+
+        // Delete old texture
+        if (oldTexture != 0)
+        {
+            glCall(glDeleteTextures, 1, &oldTexture);
         }
     }
 

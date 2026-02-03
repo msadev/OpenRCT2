@@ -95,7 +95,10 @@ OpenGLShaderProgram::OpenGLShaderProgram(const char* name)
     _id = glCall(glCreateProgram);
     glCall(glAttachShader, _id, _vertexShader->GetShaderId());
     glCall(glAttachShader, _id, _fragmentShader->GetShaderId());
+#ifndef __EMSCRIPTEN__
+    // WebGL2/GLES3 uses layout(location = 0) in shader instead
     glCall(glBindFragDataLocation, _id, 0, "oColour");
+#endif
 
     if (!Link())
     {
