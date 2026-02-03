@@ -17,6 +17,17 @@
 
 using namespace OpenRCT2::Audio;
 
+// Audio buffer size in samples
+// Larger buffers reduce audio glitches but increase latency
+#ifdef __EMSCRIPTEN__
+// Web builds need larger buffers to handle frame rate variations
+// 8192 samples at 22050 Hz = ~372ms buffer (prevents stuttering during scene transitions)
+constexpr int kAudioBufferSamples = 8192;
+#else
+// Native builds can use smaller buffers for lower latency
+constexpr int kAudioBufferSamples = 2048;
+#endif
+
 AudioMixer::~AudioMixer()
 {
     Close();
@@ -30,7 +41,7 @@ void AudioMixer::Init(const char* device)
     want.freq = 22050;
     want.format = AUDIO_S16SYS;
     want.channels = 2;
-    want.samples = 2048;
+    want.samples = kAudioBufferSamples;
     want.callback = [](void* arg, uint8_t* dst, int32_t length) -> void {
         auto* mixer = static_cast<AudioMixer*>(arg);
         mixer->GetNextAudioChunk(dst, static_cast<size_t>(length));
