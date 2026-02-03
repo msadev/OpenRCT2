@@ -216,6 +216,7 @@ namespace OpenRCT2::Ui
         GLuint GetPaletteTexture();
         GLuint GetBlendPaletteTexture();
         static GLint PaletteToY(Drawing::FilterPaletteID palette);
+        void RegeneratePaletteTexture();
 
     private:
         void CreateTextures();

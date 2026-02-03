@@ -194,7 +194,9 @@ void TextureCache::CreateTextures()
         glCall(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glCall(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glCall(glPixelStorei, GL_UNPACK_ALIGNMENT, 1);
-        GeneratePaletteTexture();
+        // Allocate empty palette texture - will be populated by RegeneratePaletteTexture()
+        // after palette data is loaded. This avoids "Invalid entry in palettes.dat" warnings.
+        glCall(glTexImage2D, GL_TEXTURE_2D, 0, GL_R8UI, 256, 256, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, nullptr);
 
         auto blendArray = GetBlendColourMap();
         if (blendArray != nullptr)
@@ -475,6 +477,14 @@ GLuint TextureCache::GetBlendPaletteTexture()
 GLint TextureCache::PaletteToY(FilterPaletteID palette)
 {
     return palette > FilterPaletteID::paletteWater ? EnumValue(palette) + 5 : EnumValue(palette) + 1;
+}
+
+void TextureCache::RegeneratePaletteTexture()
+{
+    if (_initialized && _paletteTexture != 0)
+    {
+        GeneratePaletteTexture();
+    }
 }
 
 #endif /* DISABLE_OPENGL */

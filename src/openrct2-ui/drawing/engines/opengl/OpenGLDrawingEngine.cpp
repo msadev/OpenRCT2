@@ -674,7 +674,8 @@ void OpenGLDrawingContext::Resize(int32_t width, int32_t height)
 
 void OpenGLDrawingContext::ResetPalette()
 {
-    // FlushCommandBuffers();
+    // Regenerate the palette texture now that palette data is loaded
+    _textureCache->RegeneratePaletteTexture();
 }
 
 void OpenGLDrawingContext::StartNewDraw()
