@@ -171,6 +171,8 @@ async function loadWasmModule() {
         Module.FS.mount(Module.FS.filesystems.IDBFS, { autoPersist: true }, '/persistent');
         Module.FS.mkdir('/RCT');
         Module.FS.mount(Module.FS.filesystems.IDBFS, { autoPersist: true }, '/RCT');
+        Module.FS.mkdir('/RCT1');
+        Module.FS.mount(Module.FS.filesystems.IDBFS, { autoPersist: true }, '/RCT1');
         Module.FS.mkdir('/OpenRCT2');
         Module.FS.mount(Module.FS.filesystems.IDBFS, { autoPersist: true }, '/OpenRCT2');
 
@@ -303,33 +305,86 @@ async function handleFileUpload(event) {
         const zip = new JSZip();
         const contents = await zip.loadAsync(file);
 
-        let basePath = '/RCT/';
-        if (contents.file('Data/ch.dat')) basePath = '/RCT/';
-        else if (contents.file('RCT/Data/ch.dat')) basePath = '/';
-        else {
-            showUploadError('Invalid ZIP. Must contain Data/ch.dat');
+        const hasAnyFile = (paths) => paths.some(p => contents.file(p));
+        const detectPrefix = (checks) => {
+            for (const [prefix, paths] of checks) {
+                if (hasAnyFile(paths)) return prefix;
+            }
+            return null;
+        };
+
+        const rct2Prefix = detectPrefix([
+            ['RCT2/', ['RCT2/Data/ch.dat', 'RCT2/Data/CH.DAT']],
+            ['RCT/', ['RCT/Data/ch.dat', 'RCT/Data/CH.DAT']],
+            ['', ['Data/ch.dat', 'Data/CH.DAT']],
+        ]);
+
+        if (rct2Prefix === null) {
+            showUploadError('Invalid ZIP. Must contain RCT2 Data/ch.dat');
             return;
         }
 
+        const rct1Prefix = detectPrefix([
+            ['RCT1/', [
+                'RCT1/Data/CSG1.DAT',
+                'RCT1/Data/CSG1.1',
+                'RCT1/Data/CSG1I.DAT',
+                'RCT1/Data/csg1.dat',
+                'RCT1/Data/csg1.1',
+                'RCT1/Data/csg1i.dat',
+            ]],
+            ['', [
+                'Data/CSG1.DAT',
+                'Data/CSG1.1',
+                'Data/CSG1I.DAT',
+                'Data/csg1.dat',
+                'Data/csg1.1',
+                'Data/csg1i.dat',
+            ]],
+        ]);
+
+        const hasRCT1 = rct1Prefix !== null;
+        const jobs = [
+            { name: 'RCT2', basePath: '/RCT/', stripPrefix: rct2Prefix },
+        ];
+        if (hasRCT1) {
+            jobs.push({ name: 'RCT1', basePath: '/RCT1/', stripPrefix: rct1Prefix });
+        }
+
         const files = Object.entries(contents.files);
-        const total = files.length;
+        const items = [];
+        for (const [path, entry] of files) {
+            if (entry.dir) continue;
+            for (const job of jobs) {
+                if (!path.startsWith(job.stripPrefix)) continue;
+                const relativePath = job.stripPrefix ? path.slice(job.stripPrefix.length) : path;
+                if (!relativePath) continue;
+                items.push({ relativePath, fullPath: job.basePath + relativePath, entry });
+                break;
+            }
+        }
+
+        const total = items.length;
         let count = 0;
 
         setUploadProgress(`Extracting files... (0/${total})`, 0);
 
-        for (const [path, entry] of files) {
-            const fullPath = basePath + path;
-            if (entry.dir) {
-                try { Module.FS.mkdir(fullPath); } catch {}
-            } else {
-                Module.FS.writeFile(fullPath, await entry.async('uint8array'));
+        for (const item of items) {
+            const { relativePath, fullPath, entry } = item;
+            // Ensure parent directories exist
+            const parts = fullPath.split('/').filter(Boolean);
+            let currentPath = '';
+            for (let i = 0; i < parts.length - 1; i++) {
+                currentPath += '/' + parts[i];
+                try { Module.FS.mkdir(currentPath); } catch {}
             }
+            Module.FS.writeFile(fullPath, await entry.async('uint8array'));
             count++;
 
             // Update progress every 10 files or at the end
             if (count % 10 === 0 || count === total) {
                 const percent = Math.round((count / total) * 95);
-                setUploadProgress(`Extracting: ${path.split('/').pop()}`, percent);
+                setUploadProgress(`Extracting: ${relativePath.split('/').pop()}`, percent);
             }
         }
 
@@ -337,7 +392,7 @@ async function handleFileUpload(event) {
         await new Promise(resolve => Module.FS.syncfs(false, resolve));
 
         hasRCT2Files = true;
-        showUploadSuccess('RCT2 files loaded successfully!');
+        showUploadSuccess(hasRCT1 ? 'RCT2 + RCT1 files loaded successfully!' : 'RCT2 files loaded successfully!');
         updateSetupScreen();
     } catch (e) {
         console.error('Error processing file:', e);
@@ -351,7 +406,7 @@ function startGame() {
     canvas.style.display = 'block';
     fetch('https://api.github.com/repos/OpenRCT2/OpenRCT2/releases/latest')
         .then(r => r.json()).then(j => Module.FS.writeFile('/OpenRCT2/changelog.txt', j.body || '')).catch(() => {});
-    Module.callMain(['--user-data-path=/persistent/', '--openrct2-data-path=/OpenRCT2/']);
+    Module.callMain(['--user-data-path=/persistent/', '--openrct2-data-path=/OpenRCT2/', '--rct1-data-path=/RCT1/']);
 }
 
 async function main() {
