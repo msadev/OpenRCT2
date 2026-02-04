@@ -7,13 +7,13 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
+#ifdef __EMSCRIPTEN__
+
 #include "AudioContext.h"
 
-#ifndef __EMSCRIPTEN__
-
 #include "../SDLException.h"
-#include "AudioMixer.h"
 #include "SDLAudioSource.h"
+#include "WebAudioMixer.h"
 
 #include <SDL.h>
 #include <memory>
@@ -24,24 +24,24 @@
 
 namespace OpenRCT2::Audio
 {
-    class AudioContext final : public IAudioContext
+    class WebAudioContext final : public IAudioContext
     {
     private:
         static constexpr size_t kStreamMinSize = 2 * 1024 * 1024; // 2 MiB
 
-        std::unique_ptr<AudioMixer> _audioMixer;
+        std::unique_ptr<WebAudioMixer> _audioMixer;
 
     public:
-        AudioContext()
+        WebAudioContext()
         {
             if (SDL_Init(SDL_INIT_AUDIO) < 0)
             {
                 Ui::SDLException::Throw("SDL_Init(SDL_INIT_AUDIO)");
             }
-            _audioMixer = std::make_unique<AudioMixer>();
+            _audioMixer = std::make_unique<WebAudioMixer>();
         }
 
-        ~AudioContext() override
+        ~WebAudioContext() override
         {
             SDL_QuitSubSystem(SDL_INIT_AUDIO);
         }
@@ -53,13 +53,8 @@ namespace OpenRCT2::Audio
 
         std::vector<std::string> GetOutputDevices() override
         {
-            std::vector<std::string> devices;
-            int32_t numDevices = SDL_GetNumAudioDevices(SDL_FALSE);
-            for (int32_t i = 0; i < numDevices; i++)
-            {
-                devices.emplace_back(String::toStd(SDL_GetAudioDeviceName(i, SDL_FALSE)));
-            }
-            return devices;
+            // WebAudio does not support enumerating system devices.
+            return { "" };
         }
 
         void SetOutputDevice(const std::string& deviceName) override
@@ -98,7 +93,7 @@ namespace OpenRCT2::Audio
             }
 
             // Stream will already be in memory, so convert to target format
-            auto& targetFormat = _audioMixer->GetFormat();
+            auto targetFormat = source->GetFormat();
             source = source->ToMemory(targetFormat);
 
             return AddSource(std::move(source));
@@ -120,7 +115,7 @@ namespace OpenRCT2::Audio
                 auto dataLength = source->GetLength();
                 if (dataLength < kStreamMinSize)
                 {
-                    auto& targetFormat = _audioMixer->GetFormat();
+                    auto targetFormat = source->GetFormat();
                     source = source->ToMemory(targetFormat);
                 }
 
@@ -205,7 +200,7 @@ namespace OpenRCT2::Audio
 
     std::unique_ptr<IAudioContext> CreateAudioContext()
     {
-        return std::make_unique<AudioContext>();
+        return std::make_unique<WebAudioContext>();
     }
 } // namespace OpenRCT2::Audio
 

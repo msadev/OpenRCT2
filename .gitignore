@@ -26,6 +26,8 @@ build-wasm-deps/
 #lib
 lib
 libversion
+!web/src/lib/
+!web/src/lib/**
 
 # Downloaded or built data files
 data/g2.dat

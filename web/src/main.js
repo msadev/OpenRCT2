@@ -2,6 +2,8 @@
  * OpenRCT2 Web - Main Entry Point
  */
 
+import { installWebAudio } from './lib/webaudio.js';
+
 let Module = null;
 let hasRCT2Files = false;
 
@@ -25,6 +27,14 @@ function setStatus(message, progress = null, detail = '') {
     statusMessage.textContent = message;
     if (progress !== null) progressBar.style.width = `${progress}%`;
     if (progressDetail) progressDetail.textContent = detail;
+}
+
+function resumeAudioContext() {
+    if (!Module || !Module.WebAudio || !Module.WebAudio.ctx) return;
+    const ctx = Module.WebAudio.ctx;
+    if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
 }
 
 function setUploadProgress(message, progress) {
@@ -151,6 +161,10 @@ async function loadWasmModule() {
             locateFile: fileName => assets && fileName === 'openrct2.wasm' ? assets.wasm : fileName
         });
         window.Module = Module;
+        installWebAudio(Module);
+        startButton.addEventListener('click', resumeAudioContext, { once: true });
+        canvas.addEventListener('click', resumeAudioContext, { once: true });
+        document.addEventListener('keydown', resumeAudioContext, { once: true });
 
         setStatus('Setting up filesystem...', 70);
         Module.FS.mkdir('/persistent');

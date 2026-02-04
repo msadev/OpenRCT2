@@ -262,6 +262,37 @@ var EmscriptenDeps = {
         const country = locale.split("-").pop().toUpperCase();
         const code = localeToCurrencyMap[country] || "USD";
         return stringToNewUTF8(code);
+    },
+    WebAudioEnsureInit__proxy: 'sync',
+    WebAudioEnsureInit: () => {
+        if (!Module || Module.WebAudio) {
+            return;
+        }
+        // Web audio is installed by web/src/main.js after module creation.
+    },
+    WebAudioStopChannel__proxy: 'sync',
+    WebAudioStopChannel: (channelId) => {
+        if (!Module || !Module.WebAudio) return;
+        Module.WebAudio.stopChannel(channelId);
+    },
+    WebAudioPlayChannel__proxy: 'sync',
+    WebAudioPlayChannel: (
+        channelId, channelCount, frames, sampleRate, dataPtr, loop, rate, volume, pan, offsetSeconds
+    ) => {
+        if (!Module || !Module.WebAudio) return;
+        Module.WebAudio.playChannel(
+            channelId, channelCount, frames, sampleRate, dataPtr, loop, rate, volume, pan, offsetSeconds
+        );
+    },
+    WebAudioUpdateChannel__proxy: 'sync',
+    WebAudioUpdateChannel: (channelId, rate, volume, pan, offsetSeconds, restart) => {
+        if (!Module || !Module.WebAudio) return;
+        Module.WebAudio.updateChannel(channelId, rate, volume, pan, offsetSeconds, restart);
+    },
+    WebAudioGetOffsetSeconds__proxy: 'sync',
+    WebAudioGetOffsetSeconds: (channelId) => {
+        if (!Module || !Module.WebAudio) return 0;
+        return Module.WebAudio.getOffsetSeconds(channelId);
     }
 };
 

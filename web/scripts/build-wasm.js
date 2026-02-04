@@ -407,7 +407,7 @@ function buildWasm(env, depsPaths) {
   }
 
   const emscriptenFlags = `-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_LIBPNG=1 -sUSE_ICU=1 -pthread -O3 -fno-lto -I${depsPaths.jsonInclude}`;
-  const emscriptenExportedFunctions = '_GetVersion,_main';
+  const emscriptenExportedFunctions = '_GetVersion,_main,_WebAudioChannelEnded';
   const emscriptenLdFlags = [
     '-fno-lto',
     '-Wno-pthreads-mem-growth',

@@ -50,6 +50,7 @@
 #include <vector>
 
 #ifdef __EMSCRIPTEN__
+#    include "audio/WebAudioMixer.h"
     #include <emscripten.h>
     #include <emscripten/html5.h>
 #endif
@@ -149,6 +150,16 @@ public:
         _windowManager->UpdateMapTooltip();
 
         WindowDispatchUpdateAll();
+
+#ifdef __EMSCRIPTEN__
+        if (auto* mixer = GetContext()->GetAudioContext().GetMixer())
+        {
+            if (auto* webMixer = dynamic_cast<OpenRCT2::Audio::WebAudioMixer*>(mixer))
+            {
+                webMixer->Tick();
+            }
+        }
+#endif
     }
 
     void Draw(RenderTarget& rt) override
