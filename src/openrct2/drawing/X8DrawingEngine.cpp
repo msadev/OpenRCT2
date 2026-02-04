@@ -50,14 +50,17 @@ void X8WeatherDrawer::Draw(
     const uint8_t* weatherpattern)
 {
     const uint8_t* pattern = weatherpattern;
-    auto patternXSpace = *pattern++;
-    auto patternYSpace = *pattern++;
+    const uint8_t patternXSpace = *pattern++;
+    const uint8_t patternYSpace = *pattern++;
+    const bool powerOfTwo = (patternXSpace & (patternXSpace - 1)) == 0 && (patternYSpace & (patternYSpace - 1)) == 0;
+    const uint8_t xMask = powerOfTwo ? static_cast<uint8_t>(patternXSpace - 1) : 0;
+    const uint8_t yMask = powerOfTwo ? static_cast<uint8_t>(patternYSpace - 1) : 0;
 
-    uint8_t patternStartXOffset = xStart % patternXSpace;
-    uint8_t patternStartYOffset = yStart % patternYSpace;
+    uint8_t patternStartXOffset = powerOfTwo ? (xStart & xMask) : static_cast<uint8_t>(xStart % patternXSpace);
+    uint8_t patternStartYOffset = powerOfTwo ? (yStart & yMask) : static_cast<uint8_t>(yStart % patternYSpace);
 
     uint32_t pixelOffset = rt.LineStride() * y + x;
-    uint8_t patternYPos = patternStartYOffset % patternYSpace;
+    uint8_t patternYPos = powerOfTwo ? (patternStartYOffset & yMask) : static_cast<uint8_t>(patternStartYOffset % patternYSpace);
 
     uint8_t* screenBits = rt.bits;
 
@@ -65,32 +68,44 @@ void X8WeatherDrawer::Draw(
     WeatherPixel* newPixels = &_weatherPixels[_weatherPixelsCount];
     for (; height != 0; height--)
     {
+        if (_weatherPixelsCount >= (_weatherPixelsCapacity - static_cast<uint32_t>(width)))
+        {
+            return;
+        }
+
         auto patternX = pattern[patternYPos * 2];
         if (patternX != 0xFF)
         {
-            if (_weatherPixelsCount < (_weatherPixelsCapacity - static_cast<uint32_t>(width)))
+            uint32_t finalPixelOffset = width + pixelOffset;
+
+            uint32_t xPixelOffset = pixelOffset;
+            const uint8_t startOffset = powerOfTwo
+                ? static_cast<uint8_t>((patternX - patternStartXOffset) & xMask)
+                : static_cast<uint8_t>((patternX - patternStartXOffset) % patternXSpace);
+            xPixelOffset += startOffset;
+
+            auto patternPixel = pattern[patternYPos * 2 + 1];
+            for (; xPixelOffset < finalPixelOffset; xPixelOffset += patternXSpace)
             {
-                uint32_t finalPixelOffset = width + pixelOffset;
+                uint8_t current_pixel = screenBits[xPixelOffset];
+                screenBits[xPixelOffset] = patternPixel;
+                _weatherPixelsCount++;
 
-                uint32_t xPixelOffset = pixelOffset;
-                xPixelOffset += (static_cast<uint8_t>(patternX - patternStartXOffset)) % patternXSpace;
-
-                auto patternPixel = pattern[patternYPos * 2 + 1];
-                for (; xPixelOffset < finalPixelOffset; xPixelOffset += patternXSpace)
-                {
-                    uint8_t current_pixel = screenBits[xPixelOffset];
-                    screenBits[xPixelOffset] = patternPixel;
-                    _weatherPixelsCount++;
-
-                    // Store colour and position
-                    *newPixels++ = { xPixelOffset, current_pixel };
-                }
+                // Store colour and position
+                *newPixels++ = { xPixelOffset, current_pixel };
             }
         }
 
         pixelOffset += rt.LineStride();
         patternYPos++;
-        patternYPos %= patternYSpace;
+        if (powerOfTwo)
+        {
+            patternYPos &= yMask;
+        }
+        else
+        {
+            patternYPos %= patternYSpace;
+        }
     }
 }
 

@@ -93,6 +93,10 @@ static void DrawLightRain(
     y_start += top;
     weatherDrawer->Draw(rt, left, top, width, height, x_start, y_start, kRainPattern);
 
+#ifdef __EMSCRIPTEN__
+    return;
+#endif
+
     x_start = -static_cast<int32_t>(currentTicks) + 0x18;
     y_start = (currentTicks * 4) + 0x0D;
     y_start = -y_start;
@@ -116,6 +120,10 @@ static void DrawHeavyRain(
     x_start += left;
     y_start += top;
     weatherDrawer->Draw(rt, left, top, width, height, x_start, y_start, kRainPattern);
+
+#ifdef __EMSCRIPTEN__
+    return;
+#endif
 
     x_start = -static_cast<int32_t>(currentTicks) + 0x10;
     y_start = (currentTicks * 6) + 5;
@@ -155,6 +163,10 @@ static void DrawLightSnow(
     y_start += top;
     weatherDrawer->Draw(rt, left, top, width, height, x_start, y_start, kSnowPattern);
 
+#ifdef __EMSCRIPTEN__
+    return;
+#endif
+
     x_start = negT + 16 + (cos(cosTick) * 6);
     y_start = t + 16;
     y_start = -y_start;
@@ -174,6 +186,10 @@ static void DrawHeavySnow(
     x_start += left;
     y_start += top;
     weatherDrawer->Draw(rt, left, top, width, height, x_start, y_start, kSnowPattern);
+
+#ifdef __EMSCRIPTEN__
+    return;
+#endif
 
     x_start = -static_cast<int32_t>(currentTicks * 4) + 6;
     y_start = currentTicks + 5;
