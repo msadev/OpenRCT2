@@ -82,6 +82,8 @@ function execOutput(command, options = {}) {
   }
 }
 
+// (no extra helper functions needed)
+
 /**
  * Find emsdk installation
  */
@@ -284,6 +286,32 @@ async function buildDependencies(env) {
     console.log('libzip already built, skipping...');
   }
 
+  // Build mbedTLS (crypto backend for Emscripten)
+  const mbedtlsDir = join(DEPS_DIR, 'mbedtls');
+  const mbedtlsBuildDir = join(mbedtlsDir, 'build');
+  const mbedcryptoLibPath = join(mbedtlsBuildDir, 'library', 'libmbedcrypto.a');
+  const mbedx509LibPath = join(mbedtlsBuildDir, 'library', 'libmbedx509.a');
+  const mbedtlsLibPath = join(mbedtlsBuildDir, 'library', 'libmbedtls.a');
+  if (!existsSync(mbedcryptoLibPath) || !existsSync(mbedx509LibPath) || !existsSync(mbedtlsLibPath)) {
+    console.log('\n--- Building mbedTLS ---\n');
+    if (!existsSync(mbedtlsDir)) {
+      exec(`git clone --depth 1 --branch v2.28.8 https://github.com/Mbed-TLS/mbedtls.git "${mbedtlsDir}"`);
+    }
+    mkdirSync(mbedtlsBuildDir, { recursive: true });
+    exec([
+      'emcmake cmake ..',
+      '-G Ninja',
+      '-DCMAKE_BUILD_TYPE=Release',
+      '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+      '-DENABLE_TESTING=OFF',
+      '-DENABLE_PROGRAMS=OFF',
+      '-DUSE_SHARED_MBEDTLS_LIBRARY=OFF'
+    ].join(' '), { cwd: mbedtlsBuildDir, env });
+    exec('ninja', { cwd: mbedtlsBuildDir, env });
+  } else {
+    console.log('mbedTLS already built, skipping...');
+  }
+
   // Build speexdsp (using CMake wrapper since autotools doesn't work on Windows)
   const speexdspDir = join(DEPS_DIR, 'speexdsp');
   const speexdspBuildDir = join(speexdspDir, 'build');
@@ -389,6 +417,10 @@ target_compile_definitions(speexdsp PRIVATE
     libzipLib: libzipLibPath.replace(/\\/g, '/'),
     libzipInclude: join(libzipDir, 'lib').replace(/\\/g, '/'),
     libzipBuildInclude: join(libzipDir, 'build').replace(/\\/g, '/'),
+    mbedtlsInclude: join(mbedtlsDir, 'include').replace(/\\/g, '/'),
+    mbedcryptoLib: mbedcryptoLibPath.replace(/\\/g, '/'),
+    mbedx509Lib: mbedx509LibPath.replace(/\\/g, '/'),
+    mbedtlsLib: mbedtlsLibPath.replace(/\\/g, '/'),
     speexdspLib: speexdspLibPath.replace(/\\/g, '/'),
     speexdspInclude: join(speexdspDir, 'include').replace(/\\/g, '/'),
     speexdspBuildInclude: speexdspBuildDir.replace(/\\/g, '/'),
@@ -407,7 +439,7 @@ function buildWasm(env, depsPaths) {
   }
 
   const emscriptenFlags = `-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_LIBPNG=1 -sUSE_ICU=1 -pthread -O3 -fno-lto -I${depsPaths.jsonInclude}`;
-  const emscriptenExportedFunctions = '_GetVersion,_main,_WebAudioChannelEnded';
+  const emscriptenExportedFunctions = '_GetVersion,_main,_WebAudioChannelEnded,_OpenRCT2ServerListResponse';
   const emscriptenLdFlags = [
     '-fno-lto',
     '-Wno-pthreads-mem-growth',
@@ -433,12 +465,16 @@ function buildWasm(env, depsPaths) {
     '-G Ninja',
     '-DCMAKE_BUILD_TYPE=Release',
     '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF',
-    '-DDISABLE_NETWORK=ON',
+    '-DDISABLE_NETWORK=OFF',
     '-DDISABLE_OPENGL=OFF',
     '-DDISABLE_HTTP=ON',
     '-DDISABLE_TTF=ON',
     '-DDISABLE_FLAC=ON',
     '-DDISABLE_DISCORD_RPC=ON',
+    `-DMBEDTLS_INCLUDE_DIRS="${depsPaths.mbedtlsInclude}"`,
+    `-DMBEDCRYPTO_LIBRARY="${depsPaths.mbedcryptoLib}"`,
+    `-DMBEDX509_LIBRARY="${depsPaths.mbedx509Lib}"`,
+    `-DMBEDTLS_LIBRARY="${depsPaths.mbedtlsLib}"`,
     `-DSPEEXDSP_INCLUDE_DIR="${depsPaths.speexdspInclude}"`,
     `-DSPEEXDSP_LIBRARY="${depsPaths.speexdspLib}"`,
     `-DLIBZIP_LIBRARIES="${depsPaths.libzipLib}"`,
@@ -447,7 +483,7 @@ function buildWasm(env, depsPaths) {
     `-DZSTD_INCLUDE_DIRS="${depsPaths.zstdInclude}"`,
     `-DEMSCRIPTEN_FLAGS="${emscriptenFlags}"`,
     `-DEMSCRIPTEN_EXPORTED_FUNCTIONS="${emscriptenExportedFunctions}"`,
-    `-DEMSCRIPTEN_LDFLAGS="${emscriptenLdFlags}"`
+    `-DEMSCRIPTEN_LDFLAGS="${emscriptenLdFlags} --pre-js ${join(ROOT_DIR, 'emscripten', 'pre.js')}"`
   ].join(' ');
 
   exec(cmakeCmd, { cwd: BUILD_WASM_DIR, env });
@@ -608,6 +644,10 @@ async function main() {
       libzipLib: join(DEPS_DIR, 'libzip', 'build', 'lib', 'libzip.a').replace(/\\/g, '/'),
       libzipInclude: join(DEPS_DIR, 'libzip', 'lib').replace(/\\/g, '/'),
       libzipBuildInclude: join(DEPS_DIR, 'libzip', 'build').replace(/\\/g, '/'),
+      mbedtlsInclude: join(DEPS_DIR, 'mbedtls', 'include').replace(/\\/g, '/'),
+      mbedcryptoLib: join(DEPS_DIR, 'mbedtls', 'build', 'library', 'libmbedcrypto.a').replace(/\\/g, '/'),
+      mbedx509Lib: join(DEPS_DIR, 'mbedtls', 'build', 'library', 'libmbedx509.a').replace(/\\/g, '/'),
+      mbedtlsLib: join(DEPS_DIR, 'mbedtls', 'build', 'library', 'libmbedtls.a').replace(/\\/g, '/'),
       speexdspLib: join(DEPS_DIR, 'speexdsp', 'build', 'libspeexdsp.a').replace(/\\/g, '/'),
       speexdspInclude: join(DEPS_DIR, 'speexdsp', 'include').replace(/\\/g, '/'),
       jsonInclude: join(DEPS_DIR, 'nlohmann-json', 'include').replace(/\\/g, '/')

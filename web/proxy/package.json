@@ -1,0 +1,21 @@
+{
+  "name": "openrct2-websocket-proxy",
+  "version": "1.0.0",
+  "description": "WebSocket to TCP proxy for OpenRCT2 web clients",
+  "type": "module",
+  "main": "websocket-proxy.js",
+  "scripts": {
+    "start": "node websocket-proxy.js",
+    "start:dev": "node websocket-proxy.js 8080"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "keywords": [
+    "openrct2",
+    "websocket",
+    "proxy",
+    "gaming"
+  ],
+  "license": "GPL-2.0"
+}

@@ -8,6 +8,12 @@ let Module = null;
 let hasRCT2Files = false;
 let hasRCT1Files = false;
 
+// Configure WebSocket proxy for multiplayer support (optional)
+// Override this before loading if you host your own proxy
+if (!window.openrct2_websocket_proxy) {
+    window.openrct2_websocket_proxy = 'ws://localhost:8080';
+}
+
 const loadingScreen = document.getElementById('loading-screen');
 const setupScreen = document.getElementById('setup-screen');
 const setupMessage = document.getElementById('setup-message');

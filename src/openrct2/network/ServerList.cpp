@@ -30,9 +30,95 @@
 
     #include <numeric>
     #include <optional>
+#ifdef __EMSCRIPTEN__
+    #include <emscripten.h>
+    #include <mutex>
+#endif
+
+#ifdef __EMSCRIPTEN__
+extern "C" EMSCRIPTEN_KEEPALIVE void OpenRCT2ServerListResponse(const char* jsonText);
+#endif
 
 namespace OpenRCT2::Network
 {
+#ifdef __EMSCRIPTEN__
+    namespace
+    {
+        std::mutex gServerListMutex;
+        std::shared_ptr<std::promise<std::vector<ServerListEntry>>> gServerListPromise;
+
+        std::vector<ServerListEntry> ParseServerListJson(std::string_view jsonText)
+        {
+            if (jsonText.empty())
+            {
+                throw MasterServerException(STR_SERVER_LIST_NO_CONNECTION);
+            }
+
+            auto root = Json::FromString(jsonText);
+            if (!root.is_object())
+            {
+                throw MasterServerException(STR_SERVER_LIST_INVALID_RESPONSE_JSON_ARRAY);
+            }
+
+            auto jsonStatus = root["status"];
+            if (!jsonStatus.is_number_integer())
+            {
+                throw MasterServerException(STR_SERVER_LIST_INVALID_RESPONSE_JSON_NUMBER);
+            }
+
+            auto status = Json::GetNumber<int32_t>(jsonStatus);
+            if (status != 200)
+            {
+                throw MasterServerException(STR_SERVER_LIST_MASTER_SERVER_FAILED);
+            }
+
+            auto jServers = root["servers"];
+            if (!jServers.is_array())
+            {
+                throw MasterServerException(STR_SERVER_LIST_INVALID_RESPONSE_JSON_ARRAY);
+            }
+
+            std::vector<ServerListEntry> entries;
+            for (auto& jServer : jServers)
+            {
+                if (jServer.is_object())
+                {
+                    auto entry = ServerListEntry::FromJson(jServer);
+                    if (entry.has_value())
+                    {
+                        entries.push_back(std::move(*entry));
+                    }
+                }
+            }
+            return entries;
+        }
+    } // namespace
+
+extern "C" EMSCRIPTEN_KEEPALIVE void OpenRCT2ServerListResponse(const char* jsonText)
+{
+    std::shared_ptr<std::promise<std::vector<ServerListEntry>>> promise;
+    {
+        std::lock_guard<std::mutex> lock(gServerListMutex);
+        promise = gServerListPromise;
+        gServerListPromise.reset();
+    }
+
+    if (!promise)
+    {
+        return;
+    }
+
+    try
+    {
+        promise->set_value(ParseServerListJson(jsonText ? std::string_view(jsonText) : std::string_view()));
+    }
+    catch (...)
+    {
+        promise->set_exception(std::current_exception());
+    }
+}
+#endif
+
     int32_t ServerListEntry::CompareTo(const ServerListEntry& other) const
     {
         const auto& a = *this;
@@ -356,6 +442,25 @@ namespace OpenRCT2::Network
 
     std::future<std::vector<ServerListEntry>> ServerList::FetchOnlineServerListAsync() const
     {
+#ifdef __EMSCRIPTEN__
+        auto p = std::make_shared<std::promise<std::vector<ServerListEntry>>>();
+        auto f = p->get_future();
+
+        {
+            std::lock_guard<std::mutex> lock(gServerListMutex);
+            gServerListPromise = p;
+        }
+
+        EM_ASM({
+            if (typeof window !== 'undefined' && typeof window.openrct2_fetch_server_list === 'function') {
+                window.openrct2_fetch_server_list();
+            } else if (Module && Module.ccall) {
+                Module.ccall('OpenRCT2ServerListResponse', null, ['string'], [""]);
+            }
+        });
+
+        return f;
+#else
     #ifdef DISABLE_HTTP
         return {};
     #else
@@ -426,6 +531,7 @@ namespace OpenRCT2::Network
         });
         return f;
     #endif
+#endif
     }
 
     uint32_t ServerList::GetTotalPlayerCount() const
