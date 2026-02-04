@@ -98,6 +98,10 @@ namespace OpenRCT2
         using namespace std::chrono_literals;
 
         static constexpr auto kForcedUpdateInterval = 25ms;
+#ifdef __EMSCRIPTEN__
+        static constexpr uint32_t kWebMaxTicksPerFrame = 2;
+        static constexpr uint32_t kWebWindowUpdateIntervalTicks = 2;
+#endif
     } // namespace
 
     class Context final : public IContext
@@ -160,6 +164,9 @@ namespace OpenRCT2
         Timer _forcedUpdateTimer;
 
         BackgroundWorker _backgroundWorker;
+#ifdef __EMSCRIPTEN__
+        uint32_t _lastWindowUpdateRealTimeTick = 0;
+#endif
 
     public:
         // Singleton of Context.
@@ -1370,17 +1377,33 @@ namespace OpenRCT2
                 return;
             }
 
+            uint32_t ticksThisFrame = 0;
             while (_ticksAccumulator >= kGameUpdateTimeMS)
             {
                 Tick();
 
                 _ticksAccumulator -= kGameUpdateTimeMS;
+#ifdef __EMSCRIPTEN__
+                if (++ticksThisFrame >= kWebMaxTicksPerFrame)
+                {
+                    _ticksAccumulator = std::min(_ticksAccumulator, kGameUpdateTimeMS);
+                    break;
+                }
+#endif
             }
 
             _backgroundWorker.dispatchCompleted();
 
             ContextHandleInput();
+#ifdef __EMSCRIPTEN__
+            if (gCurrentRealTimeTicks >= _lastWindowUpdateRealTimeTick + kWebWindowUpdateIntervalTicks)
+            {
+                _lastWindowUpdateRealTimeTick = gCurrentRealTimeTicks;
+                WindowUpdateAll();
+            }
+#else
             WindowUpdateAll();
+#endif
 
             if (ShouldDraw())
             {
@@ -1397,6 +1420,7 @@ namespace OpenRCT2
 
             _uiContext->ProcessMessages();
 
+            uint32_t ticksThisFrame = 0;
             while (_ticksAccumulator >= kGameUpdateTimeMS)
             {
                 // Get the original position of each sprite
@@ -1410,12 +1434,27 @@ namespace OpenRCT2
                 // Get the next position of each sprite
                 if (shouldDraw)
                     tweener.PostTick();
+#ifdef __EMSCRIPTEN__
+                if (++ticksThisFrame >= kWebMaxTicksPerFrame)
+                {
+                    _ticksAccumulator = std::min(_ticksAccumulator, kGameUpdateTimeMS);
+                    break;
+                }
+#endif
             }
 
             _backgroundWorker.dispatchCompleted();
 
             ContextHandleInput();
+#ifdef __EMSCRIPTEN__
+            if (gCurrentRealTimeTicks >= _lastWindowUpdateRealTimeTick + kWebWindowUpdateIntervalTicks)
+            {
+                _lastWindowUpdateRealTimeTick = gCurrentRealTimeTicks;
+                WindowUpdateAll();
+            }
+#else
             WindowUpdateAll();
+#endif
 
             if (shouldDraw)
             {

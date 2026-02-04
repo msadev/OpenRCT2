@@ -33,6 +33,7 @@
 #include <openrct2/Context.h>
 #include <openrct2/Diagnostic.h>
 #include <openrct2/Input.h>
+#include <openrct2/Game.h>
 #include <openrct2/Version.h>
 #include <openrct2/audio/AudioContext.h>
 #include <openrct2/audio/AudioMixer.h>

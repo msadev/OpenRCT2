@@ -114,7 +114,89 @@ static constexpr float kWindowScrollLocations[][2] = {
     void WindowDispatchUpdateAll()
     {
         // gTooltipNotShownTicks++;
+#ifdef __EMSCRIPTEN__
+        static uint32_t lastNonActiveUpdateTick = 0;
+
+        auto isUiInteractionActive = []() {
+            const auto state = InputGetState();
+            if (state == InputState::PositioningWindow || state == InputState::Resizing || state == InputState::ScrollLeft
+                || state == InputState::ScrollRight || state == InputState::ViewportLeft || state == InputState::ViewportRight)
+            {
+                return true;
+            }
+            return gInputFlags.has(InputFlag::viewportScrolling) || gInputFlags.has(InputFlag::widgetPressed);
+        };
+
+        auto isCriticalWindow = [](WindowClass cls) {
+            switch (cls)
+            {
+                case WindowClass::rideConstruction:
+                case WindowClass::trackDesignPlace:
+                case WindowClass::trackDesignList:
+                case WindowClass::manageTrackDesign:
+                case WindowClass::constructRide:
+                case WindowClass::installTrack:
+                case WindowClass::trackDeletePrompt:
+                case WindowClass::editorObjectSelection:
+                case WindowClass::editorInventionList:
+                case WindowClass::editorInventionListDrag:
+                case WindowClass::editorScenarioOptions:
+                case WindowClass::editorParkEntrance:
+                case WindowClass::mapgen:
+                    return true;
+                default:
+                    return false;
+            }
+        };
+
+        WindowBase* activeWindow = nullptr;
+        for (auto it = gWindowList.rbegin(); it != gWindowList.rend(); ++it)
+        {
+            if ((*it)->flags.has(WindowFlag::dead))
+                continue;
+            activeWindow = it->get();
+            break;
+        }
+
+        uint32_t totalLive = 0;
+        for (auto& w : gWindowList)
+        {
+            if (!w->flags.has(WindowFlag::dead))
+                totalLive++;
+        }
+        const uint32_t inactiveCount = activeWindow ? (totalLive > 0 ? totalLive - 1 : 0) : totalLive;
+        const bool interactionActive = isUiInteractionActive();
+
+        // Refresh rate scales with number of inactive windows (more windows -> lower rate).
+        uint32_t intervalTicks = std::clamp<uint32_t>(inactiveCount == 0 ? 2 : inactiveCount, 2, 20);
+        if (interactionActive)
+        {
+            intervalTicks = 2; // 20 Hz during drag/scroll
+        }
+
+        bool shouldUpdateNonActive = gCurrentRealTimeTicks >= lastNonActiveUpdateTick + intervalTicks;
+        if (shouldUpdateNonActive)
+        {
+            lastNonActiveUpdateTick = gCurrentRealTimeTicks;
+        }
+
+        for (auto& w : gWindowList)
+        {
+            if (w->flags.has(WindowFlag::dead))
+                continue;
+            const bool forceUpdate = w.get() == activeWindow || isCriticalWindow(w->classification) || interactionActive;
+            if (forceUpdate)
+            {
+                w->onUpdate();
+            }
+            else if (shouldUpdateNonActive)
+            {
+                w->onUpdate();
+            }
+        }
+#else
         WindowVisitEach([&](WindowBase* w) { w->onUpdate(); });
+#endif
     }
 
     void WindowUpdateAllViewports()
