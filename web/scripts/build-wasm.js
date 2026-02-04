@@ -414,7 +414,7 @@ function buildWasm(env, depsPaths) {
     '-sSAFE_HEAP=0',
     '-sALLOW_MEMORY_GROWTH=1',
     '-sMAXIMUM_MEMORY=4GB',
-    '-sINITIAL_MEMORY=2GB',
+    '-sINITIAL_MEMORY=1024MB',
     '-sSTACK_SIZE=8388608',
     '-sMIN_WEBGL_VERSION=2',
     '-sMAX_WEBGL_VERSION=2',
