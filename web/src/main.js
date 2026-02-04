@@ -6,6 +6,7 @@ import { installWebAudio } from './lib/webaudio.js';
 
 let Module = null;
 let hasRCT2Files = false;
+let hasRCT1Files = false;
 
 const loadingScreen = document.getElementById('loading-screen');
 const setupScreen = document.getElementById('setup-screen');
@@ -59,6 +60,67 @@ function showUploadSuccess(msg) {
 
 function fileExists(path) {
     try { Module.FS.readFile(path); return true; } catch { return false; }
+}
+
+function anyFileExists(paths) {
+    return paths.some(p => fileExists(p));
+}
+
+function checkRCT1Files() {
+    const hasCsg1 = anyFileExists([
+        '/RCT1/Data/CSG1.DAT',
+        '/RCT1/Data/CSG1.1',
+        '/RCT1/Data/csg1.dat',
+        '/RCT1/Data/csg1.1',
+    ]);
+    const hasCsg1i = anyFileExists([
+        '/RCT1/Data/CSG1I.DAT',
+        '/RCT1/Data/csg1i.dat',
+    ]);
+    return hasCsg1 && hasCsg1i;
+}
+
+function updateConfigRct1Path(rct1Path) {
+    const configPath = '/persistent/config.ini';
+    let content = '';
+    try {
+        content = Module.FS.readFile(configPath, { encoding: 'utf8' }) || '';
+    } catch {
+        content = '';
+    }
+
+    const line = `rct1_path=${rct1Path}`;
+    if (!content) {
+        content = `[general]\n${line}\n`;
+        Module.FS.writeFile(configPath, content);
+        return;
+    }
+
+    const normalized = content.replace(/\r\n/g, '\n');
+    const generalIndex = normalized.indexOf('[general]');
+    if (generalIndex === -1) {
+        content = normalized + `\n[general]\n${line}\n`;
+        Module.FS.writeFile(configPath, content);
+        return;
+    }
+
+    const afterGeneral = normalized.slice(generalIndex);
+    const nextSectionIdx = afterGeneral.indexOf('\n[');
+    const sectionEnd = nextSectionIdx === -1 ? normalized.length : generalIndex + nextSectionIdx + 1;
+    const before = normalized.slice(0, generalIndex);
+    const section = normalized.slice(generalIndex, sectionEnd);
+    const after = normalized.slice(sectionEnd);
+
+    if (section.match(/^rct1_path=/m)) {
+        const updatedSection = section.replace(/^rct1_path=.*$/m, line);
+        content = before + updatedSection + after;
+    } else {
+        const parts = section.split('\n');
+        parts.splice(1, 0, line);
+        content = before + parts.join('\n') + after;
+    }
+
+    Module.FS.writeFile(configPath, content);
 }
 
 function formatBytes(bytes) {
@@ -188,6 +250,11 @@ async function loadWasmModule() {
 
         // Check if RCT2 files exist
         hasRCT2Files = fileExists('/RCT/Data/ch.dat');
+        hasRCT1Files = checkRCT1Files();
+        if (hasRCT1Files) {
+            updateConfigRct1Path('/RCT1/');
+            await new Promise(resolve => Module.FS.syncfs(false, resolve));
+        }
 
         setStatus('Ready!', 100);
         return true;
@@ -388,11 +455,22 @@ async function handleFileUpload(event) {
             }
         }
 
+        hasRCT2Files = true;
+        hasRCT1Files = checkRCT1Files();
+        if (hasRCT1Files) {
+            updateConfigRct1Path('/RCT1/');
+        }
+
         setUploadProgress('Saving to browser storage...', 98);
         await new Promise(resolve => Module.FS.syncfs(false, resolve));
 
-        hasRCT2Files = true;
-        showUploadSuccess(hasRCT1 ? 'RCT2 + RCT1 files loaded successfully!' : 'RCT2 files loaded successfully!');
+        if (hasRCT1Files) {
+            showUploadSuccess('RCT2 + RCT1 files loaded successfully!');
+        } else if (hasRCT1) {
+            showUploadError('RCT2 loaded, but RCT1 data is incomplete (CSG1.DAT/CSG1I.DAT missing).');
+        } else {
+            showUploadSuccess('RCT2 files loaded successfully!');
+        }
         updateSetupScreen();
     } catch (e) {
         console.error('Error processing file:', e);
