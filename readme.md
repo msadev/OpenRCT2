@@ -41,6 +41,7 @@ If you want to help translate the game to your language, please stop by the Loca
 
 # Contents
 - 1 - [Introduction](#1-introduction)
+- 1.1 - [Web port (Emscripten)](#11-web-port-emscripten)
 - 2 - [Downloading the game (pre-built)](#2-downloading-the-game-pre-built)
 - 3 - [Building the game](#3-building-the-game)
 - 4 - [Contributing](#4-contributing)
@@ -65,6 +66,22 @@ If you want to help translate the game to your language, please stop by the Loca
 **OpenRCT2** is an open-source re-implementation of RollerCoaster Tycoon 2 (RCT2). The gameplay revolves around building and maintaining an amusement park containing attractions, shops and facilities. The player must try to make a profit and maintain a good park reputation whilst keeping the guests happy. OpenRCT2 allows for both scenario and sandbox play. Scenarios require the player to complete a certain objective in a set time limit whilst sandbox allows the player to build a more flexible park with optionally no restrictions or finance.
 
 RollerCoaster Tycoon 2 was originally written by Chris Sawyer in x86 assembly and is the sequel to RollerCoaster Tycoon. The engine was based on Transport Tycoon, an older game which also has an equivalent open-source project, [OpenTTD](https://openttd.org). OpenRCT2 attempts to provide everything from RCT2 as well as many improvements and additional features, some of these include support for modern platforms, an improved interface, improved guest and staff AI, more editing tools, increased limits, and cooperative multiplayer. It also re-introduces mechanics from RollerCoaster Tycoon that were not present in RollerCoaster Tycoon 2. Some of those include; mountain tool in-game, the *"have fun"* objective, launched coasters (not passing-through the station) and several buttons on the toolbar.
+
+---
+
+# 1.1 Web port (Emscripten)
+
+This repository includes a browser build of OpenRCT2. Compared to the native desktop version, the web port adds a thin web runtime and adjusts platform integrations to fit browser constraints:
+
+* **WebAssembly build target**: the engine is compiled with Emscripten (`scripts/build-emscripten`) and produced as `openrct2.js` + `openrct2.wasm` for use in the browser.
+* **Web frontend wrapper**: `web/` provides the UI shell, dev server, and loader for the WASM module (`web/src/main.js`). See `web/README.md` for build/run steps.
+* **Browser storage**: the port mounts Emscripten IDBFS at `/persistent`, `/RCT`, and `/OpenRCT2` so saves and game files persist in IndexedDB.
+* **RCT2 files upload**: instead of reading from a local install, users upload a ZIP containing `Data/` (handled in `web/src/main.js`).
+* **Save/load integrations**: save/load uses the browser file picker when available, with a download/upload fallback for `.park` and `.td6` files (`emscripten/deps.js`).
+* **Asset delivery**: the web runtime downloads `assets.zip` and extracts it into `/OpenRCT2`, with a version check to re-extract when needed.
+* **Audio bridge**: WebAudio is wired through a small JS bridge (`web/src/main.js` + `emscripten/deps.js`) to replace native audio backends.
+* **Feature toggles for web**: certain desktop-only features are disabled in the Emscripten build (networking, HTTP, TTF, FLAC, Discord RPC) and rendering targets WebGL 2.0.
+* **Threading constraints**: the build uses WebAssembly threads and therefore requires `SharedArrayBuffer` (COOP/COEP headers in production).
 
 ---
 
