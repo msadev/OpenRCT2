@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "npm run parcel_clean && parcel serve src/index.html --port 3000",
-    "build": "parcel build src/index.html --dist-dir dist --public-url ./",
+    "build": "npm run parcel_clean && parcel build src/index.html --dist-dir dist --public-url ./",
     "build:wasm": "node scripts/build-wasm.js",
     "build:assets": "node scripts/package-assets.js",
     "build:all": "npm run build:wasm && npm run build:assets && npm run build",
@@ -19,6 +19,9 @@
     "rimraf": "^6.1.2",
     "serve": "^14.2.0",
     "yauzl": "^3.2.0"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
   },
   "browserslist": [
     "last 2 Chrome versions",

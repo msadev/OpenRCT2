@@ -2,6 +2,7 @@
  * OpenRCT2 Web - Main Entry Point
  */
 
+import JSZip from 'jszip';
 import { installWebAudio } from './lib/webaudio.js';
 
 let Module = null;
