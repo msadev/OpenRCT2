@@ -16,7 +16,7 @@
  *   HTTP GET:  http://proxy:8080/health - Health check
  */
 
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, createWebSocketStream } from 'ws';
 import { createServer } from 'http';
 import net from 'net';
 
@@ -124,8 +124,8 @@ const httpServer = createServer(async (req, res) => {
   res.end('Not Found');
 });
 
-// Max buffer before applying backpressure (64KB)
-const MAX_WS_BUFFER = 64 * 1024;
+// Stream highWaterMark (64MB) for large map transfers (16MB more players)
+const WS_STREAM_HIGH_WATER = 16 * 1024 * 1024;
 
 function handleConnection(ws, targetHost, targetPort) {
   const target = `${targetHost}:${targetPort}`;
@@ -148,34 +148,7 @@ function handleConnection(ws, targetHost, targetPort) {
   }, 10000);
 
   let connected = false;
-  let pendingMessages = [];
-
-  tcpSocket.on('connect', () => {
-    clearTimeout(connectTimeout);
-    connected = true;
-    log('PROXY', `Connected to ${target}`, null, 'debug');
-
-    // Flush any messages that arrived before TCP connected
-    for (const msg of pendingMessages) {
-      log('PROXY', `WS->TCP ${target}: ${msg.length} bytes (flushed)`, null, 'debug');
-      tcpSocket.write(msg);
-    }
-    pendingMessages = [];
-  });
-
-  tcpSocket.on('data', (data) => {
-    log('PROXY', `TCP->WS ${target}: ${data.length} bytes`, null, 'debug');
-    if (ws.readyState === ws.OPEN) {
-      ws.send(data);
-      if (ws.bufferedAmount > MAX_WS_BUFFER) {
-        tcpSocket.pause();
-      }
-    }
-  });
-
-  ws.on('drain', () => {
-    if (!tcpSocket.destroyed) tcpSocket.resume();
-  });
+  let wsStream = null;
 
   tcpSocket.on('error', (err) => {
     clearTimeout(connectTimeout);
@@ -192,32 +165,31 @@ function handleConnection(ws, targetHost, targetPort) {
     }
   });
 
-  ws.on('message', (data) => {
-    log('PROXY', `WS->TCP ${target}: ${data.length} bytes`, null, 'debug');
+  wsStream = createWebSocketStream(ws, { highWaterMark: WS_STREAM_HIGH_WATER });
+  wsStream.on('error', (err) => {
+    log('PROXY', `WebSocket stream error (${target}): ${err.message}`, null, 'error');
+    tcpSocket.destroy();
+  });
 
-    if (!connected) {
-      pendingMessages.push(data);
-      return;
-    }
+  // Pipe immediately so any early client data is queued by the TCP socket
+  wsStream.pipe(tcpSocket);
+  tcpSocket.pipe(wsStream);
 
-    if (!tcpSocket.destroyed) {
-      const canWrite = tcpSocket.write(data);
-      if (!canWrite) {
-        ws._socket.pause();
-        tcpSocket.once('drain', () => {
-          if (ws.readyState === ws.OPEN) ws._socket.resume();
-        });
-      }
-    }
+  tcpSocket.on('connect', () => {
+    clearTimeout(connectTimeout);
+    connected = true;
+    log('PROXY', `Connected to ${target}`, null, 'debug');
   });
 
   ws.on('close', () => {
     log('PROXY', `Client disconnected from ${target}`, null, 'debug');
+    if (wsStream) wsStream.destroy();
     tcpSocket.destroy();
   });
 
   ws.on('error', (err) => {
     log('PROXY', `WebSocket error: ${err.message}`, null, 'error');
+    if (wsStream) wsStream.destroy();
     tcpSocket.destroy();
   });
 }
