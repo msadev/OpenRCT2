@@ -8,19 +8,19 @@
  *   node websocket-proxy.js [port]
  *   LOG_LEVEL=debug node websocket-proxy.js [port]
  *
- * Default port: 8080
+ * Default port: 8082
  *
  * Endpoints:
- *   WebSocket: ws://proxy:8080/connect/<host>/<port> - Direct TCP connection
- *   HTTP GET:  http://proxy:8080/servers - Online server list
- *   HTTP GET:  http://proxy:8080/health - Health check
+ *   WebSocket: ws://proxy:8082/connect/<host>/<port> - Direct TCP connection
+ *   HTTP GET:  http://proxy:8082/servers - Online server list
+ *   HTTP GET:  http://proxy:8082/health - Health check
  */
 
 import { WebSocketServer, createWebSocketStream } from 'ws';
 import { createServer } from 'http';
 import net from 'net';
 
-const PROXY_PORT = parseInt(process.argv[2]) || 8080;
+const PROXY_PORT = parseInt(process.argv[2]) || 8082;
 
 // Log levels: 'error' (prod), 'info' (default), 'debug' (dev)
 const LOG_LEVEL = process.env.LOG_LEVEL || 'error';
