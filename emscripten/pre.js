@@ -29,14 +29,20 @@ if (typeof window !== 'undefined') {
 
         var url = proxyHttp ? (proxyHttp + '/servers') : (window.openrct2_master_server_url || 'https://servers.openrct2.io');
 
+        try { console.log('[OpenRCT2] Fetching server list from:', url); } catch (e) {}
+
         fetch(url)
             .then(function (res) { return res.json(); })
             .then(function (data) {
+                try {
+                    console.log('[OpenRCT2] Server list received:', Array.isArray(data) ? data.length : (data.servers ? data.servers.length : 'unknown'));
+                } catch (e) {}
                 if (Module && Module.ccall) {
                     Module.ccall('OpenRCT2ServerListResponse', null, ['string'], [JSON.stringify(data)]);
                 }
             })
             .catch(function () {
+                try { console.log('[OpenRCT2] Server list fetch failed'); } catch (e) {}
                 if (Module && Module.ccall) {
                     Module.ccall('OpenRCT2ServerListResponse', null, ['string'], ['']);
                 }

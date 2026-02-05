@@ -32,6 +32,7 @@
     #include <optional>
 #ifdef __EMSCRIPTEN__
     #include <emscripten.h>
+    #include <emscripten/threading.h>
     #include <mutex>
 #endif
 
@@ -47,6 +48,17 @@ namespace OpenRCT2::Network
         std::mutex gServerListMutex;
         std::shared_ptr<std::promise<std::vector<ServerListEntry>>> gServerListPromise;
 
+        void RequestOnlineServerList()
+        {
+            EM_ASM({
+                if (typeof window !== 'undefined' && typeof window.openrct2_fetch_server_list === 'function') {
+                    window.openrct2_fetch_server_list();
+                } else if (Module && Module.ccall) {
+                    Module.ccall('OpenRCT2ServerListResponse', null, ['string'], [""]);
+                }
+            });
+        }
+
         std::vector<ServerListEntry> ParseServerListJson(std::string_view jsonText)
         {
             if (jsonText.empty())
@@ -55,24 +67,38 @@ namespace OpenRCT2::Network
             }
 
             auto root = Json::FromString(jsonText);
-            if (!root.is_object())
+            json_t jServers;
+            if (root.is_array())
+            {
+                // Accept plain array format (no status wrapper)
+                jServers = root;
+            }
+            else if (root.is_object())
+            {
+                auto jsonStatus = root["status"];
+                if (jsonStatus.is_number_integer())
+                {
+                    auto status = Json::GetNumber<int32_t>(jsonStatus);
+                    if (status != 200)
+                    {
+                        throw MasterServerException(STR_SERVER_LIST_MASTER_SERVER_FAILED);
+                    }
+                }
+                else if (jsonStatus.is_string())
+                {
+                    auto statusStr = Json::GetString(jsonStatus);
+                    if (!String::iequals(statusStr, "ok"))
+                    {
+                        throw MasterServerException(STR_SERVER_LIST_MASTER_SERVER_FAILED);
+                    }
+                }
+                jServers = root["servers"];
+            }
+            else
             {
                 throw MasterServerException(STR_SERVER_LIST_INVALID_RESPONSE_JSON_ARRAY);
             }
 
-            auto jsonStatus = root["status"];
-            if (!jsonStatus.is_number_integer())
-            {
-                throw MasterServerException(STR_SERVER_LIST_INVALID_RESPONSE_JSON_NUMBER);
-            }
-
-            auto status = Json::GetNumber<int32_t>(jsonStatus);
-            if (status != 200)
-            {
-                throw MasterServerException(STR_SERVER_LIST_MASTER_SERVER_FAILED);
-            }
-
-            auto jServers = root["servers"];
             if (!jServers.is_array())
             {
                 throw MasterServerException(STR_SERVER_LIST_INVALID_RESPONSE_JSON_ARRAY);
@@ -451,13 +477,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void OpenRCT2ServerListResponse(const char* json
             gServerListPromise = p;
         }
 
-        EM_ASM({
-            if (typeof window !== 'undefined' && typeof window.openrct2_fetch_server_list === 'function') {
-                window.openrct2_fetch_server_list();
-            } else if (Module && Module.ccall) {
-                Module.ccall('OpenRCT2ServerListResponse', null, ['string'], [""]);
-            }
-        });
+        emscripten_async_run_in_main_runtime_thread(
+            EM_FUNC_SIG_V, reinterpret_cast<void*>(RequestOnlineServerList));
 
         return f;
 #else
