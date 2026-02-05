@@ -29,6 +29,10 @@ const uploadProgressText = document.getElementById('upload-progress-text');
 const uploadProgressBar = document.getElementById('upload-progress-bar');
 const startButton = document.getElementById('start-game');
 const canvas = document.getElementById('canvas');
+const legalModal = document.getElementById('legal-modal');
+const legalLink = document.getElementById('legal-link');
+const legalClose = document.getElementById('legal-close');
+const legalOk = document.getElementById('legal-ok');
 
 function setStatus(message, progress = null, detail = '') {
     statusMessage.textContent = message;
@@ -47,6 +51,22 @@ function resumeAudioContext() {
 function setUploadProgress(message, progress) {
     uploadProgressText.textContent = message;
     uploadProgressBar.style.width = `${progress}%`;
+}
+
+function setupLegalModal() {
+    if (!legalModal || !legalLink) return;
+    legalLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        legalModal.classList.remove('hidden');
+    });
+
+    const closeLegalModal = () => {
+        legalModal.classList.add('hidden');
+    };
+
+    legalClose?.addEventListener('click', closeLegalModal);
+    legalOk?.addEventListener('click', closeLegalModal);
+    legalModal.querySelector('.modal-backdrop')?.addEventListener('click', closeLegalModal);
 }
 
 function showUploadError(msg) {
@@ -494,6 +514,7 @@ function startGame() {
 }
 
 async function main() {
+    setupLegalModal();
     setStatus('Starting OpenRCT2 Web...', 0);
     const loaded = await loadWasmModule();
     if (!loaded) return;
