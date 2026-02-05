@@ -32,6 +32,7 @@ const MASTER_SERVER_URL = process.env.MASTER_SERVER_URL || 'https://servers.open
 let serverListCache = null;
 let serverListCacheTime = 0;
 const CACHE_TTL = 60000;
+let serverPortCache = new Set();
 
 function log(category, message, data = null, level = 'info') {
   if (LOG_LEVELS[level] > LOG_LEVELS[LOG_LEVEL]) return;
@@ -45,10 +46,8 @@ function log(category, message, data = null, level = 'info') {
   }
 }
 
-// Security: List of allowed ports (default OpenRCT2 port + extra range)
-const ALLOWED_PORTS = [
-  11753, 11754, 11755, 11756, 11757, 11758, 11759, 11760, 11761, 11762, 11763,
-];
+// Security: Optional static allowlist of ports (empty = allow dynamic list)
+const ALLOWED_PORTS = [];
 
 // Security: Optional allowlist of servers (empty = allow all)
 const ALLOWED_SERVERS = [];
@@ -90,6 +89,18 @@ const httpServer = createServer(async (req, res) => {
       const data = await response.json();
       serverListCache = data;
       serverListCacheTime = now;
+      try {
+        const ports = new Set();
+        const servers = Array.isArray(data) ? data : data?.servers;
+        if (Array.isArray(servers)) {
+          for (const s of servers) {
+            if (typeof s?.port === 'number') {
+              ports.add(s.port);
+            }
+          }
+        }
+        serverPortCache = ports;
+      } catch {}
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
@@ -231,8 +242,15 @@ wss.on('connection', (ws, req) => {
     return;
   }
 
-  if (!ALLOWED_PORTS.includes(targetPort)) {
-    log('WS', `Rejected: port ${targetPort} not allowed`, null, 'error');
+  const useStaticPorts = ALLOWED_PORTS.length > 0;
+  const useDynamicPorts = !useStaticPorts && serverPortCache.size > 0;
+  if (useStaticPorts && !ALLOWED_PORTS.includes(targetPort)) {
+    log('WS', `Rejected: port ${targetPort} not allowed (static list)`, null, 'error');
+    ws.close(1008, 'Port not allowed');
+    return;
+  }
+  if (useDynamicPorts && !serverPortCache.has(targetPort)) {
+    log('WS', `Rejected: port ${targetPort} not allowed (server list)`, null, 'error');
     ws.close(1008, 'Port not allowed');
     return;
   }

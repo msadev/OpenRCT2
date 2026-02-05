@@ -13,8 +13,11 @@
 
     #include <mbedtls/ctr_drbg.h>
     #include <mbedtls/entropy.h>
+    #include <mbedtls/base64.h>
+    #include <mbedtls/pem.h>
     #include <mbedtls/pk.h>
     #include <mbedtls/rsa.h>
+    #include <mbedtls/asn1write.h>
     #include <mbedtls/sha1.h>
     #include <mbedtls/sha256.h>
 
@@ -56,6 +59,79 @@ namespace
         if (ret != 0)
         {
             throw std::runtime_error("mbedtls_sha256_ret failed");
+        }
+    }
+
+    std::string WriteRsaPublicKeyPem(mbedtls_pk_context& pk)
+    {
+        if (!mbedtls_pk_can_do(&pk, MBEDTLS_PK_RSA))
+        {
+            throw std::runtime_error("Public key is not RSA");
+        }
+
+        mbedtls_mpi n{};
+        mbedtls_mpi e{};
+        mbedtls_mpi_init(&n);
+        mbedtls_mpi_init(&e);
+
+        unsigned char der[1024]{};
+        unsigned char* p = der + sizeof(der);
+        size_t len = 0;
+
+        try
+        {
+            auto* rsa = mbedtls_pk_rsa(pk);
+            if (mbedtls_rsa_export(rsa, &n, nullptr, nullptr, nullptr, &e) != 0)
+            {
+                throw std::runtime_error("mbedtls_rsa_export failed");
+            }
+
+            int ret = mbedtls_asn1_write_mpi(&p, der, &e);
+            if (ret < 0) throw std::runtime_error("mbedtls_asn1_write_mpi (e) failed");
+            len += static_cast<size_t>(ret);
+
+            ret = mbedtls_asn1_write_mpi(&p, der, &n);
+            if (ret < 0) throw std::runtime_error("mbedtls_asn1_write_mpi (n) failed");
+            len += static_cast<size_t>(ret);
+
+            ret = mbedtls_asn1_write_len(&p, der, len);
+            if (ret < 0) throw std::runtime_error("mbedtls_asn1_write_len failed");
+            len += static_cast<size_t>(ret);
+
+            ret = mbedtls_asn1_write_tag(&p, der, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+            if (ret < 0) throw std::runtime_error("mbedtls_asn1_write_tag failed");
+            len += static_cast<size_t>(ret);
+
+            const char* header = "-----BEGIN RSA PUBLIC KEY-----\n";
+            const char* footer = "-----END RSA PUBLIC KEY-----\n";
+
+            // PEM output size: roughly 4/3 of DER + headers. Use a loop to grow if needed.
+            size_t pemSize = 2048;
+            for (;;)
+            {
+                std::vector<unsigned char> pem(pemSize);
+                size_t outLen = 0;
+                ret = mbedtls_pem_write_buffer(
+                    header, footer, p, len, pem.data(), pem.size(), &outLen);
+                if (ret == 0)
+                {
+                    mbedtls_mpi_free(&n);
+                    mbedtls_mpi_free(&e);
+                    const char* pemStr = reinterpret_cast<char*>(pem.data());
+                    return std::string(pemStr, std::strlen(pemStr));
+                }
+                if (ret != MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
+                {
+                    throw std::runtime_error("mbedtls_pem_write_buffer failed");
+                }
+                pemSize *= 2;
+            }
+        }
+        catch (...)
+        {
+            mbedtls_mpi_free(&n);
+            mbedtls_mpi_free(&e);
+            throw;
         }
     }
 } // namespace
@@ -230,13 +306,7 @@ public:
     std::string GetPublic() override
     {
         EnsureKey();
-        std::vector<unsigned char> buf(8192);
-        int ret = mbedtls_pk_write_pubkey_pem(&_pk, buf.data(), buf.size());
-        if (ret != 0)
-        {
-            throw std::runtime_error("mbedtls_pk_write_pubkey_pem failed");
-        }
-        return std::string(reinterpret_cast<char*>(buf.data()));
+        return WriteRsaPublicKeyPem(_pk);
     }
 
     const mbedtls_pk_context& GetPk() const
