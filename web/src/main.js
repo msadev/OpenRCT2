@@ -213,28 +213,11 @@ async function loadWasmModule() {
     }
 
     try {
-        let assets = null;
-        try {
-            setStatus('Downloading game files...', 20);
-            const req = await fetch('openrct2.zip');
-            if (req.ok) {
-                const data = await req.blob();
-                const zip = new JSZip();
-                await zip.loadAsync(data);
-                assets = {
-                    js: URL.createObjectURL(new Blob([await zip.file('openrct2.js').async('uint8array')], { type: 'application/javascript' })),
-                    wasm: URL.createObjectURL(new Blob([await zip.file('openrct2.wasm').async('uint8array')], { type: 'application/wasm' }))
-                };
-            }
-        } catch (e) {
-            console.warn('openrct2.zip not found, trying individual files:', e);
-        }
-
         setStatus('Loading game engine...', 40);
 
         await new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = assets ? assets.js : 'openrct2.js';
+            script.src = 'openrct2.js';
             script.onload = resolve;
             script.onerror = reject;
             document.body.appendChild(script);
@@ -247,7 +230,7 @@ async function loadWasmModule() {
             canvas: canvas,
             print: msg => console.log('[OpenRCT2]', msg),
             printErr: msg => console.error('[OpenRCT2]', msg),
-            locateFile: fileName => assets && fileName === 'openrct2.wasm' ? assets.wasm : fileName
+            locateFile: fileName => fileName
         });
         window.Module = Module;
         installWebAudio(Module);
