@@ -12,7 +12,7 @@ let hasRCT1Files = false;
 // Configure WebSocket proxy for multiplayer support (optional)
 // Override this before loading if you host your own proxy
 if (!window.openrct2_websocket_proxy) {
-    window.openrct2_websocket_proxy = 'wss://openwebports.org/ports/openrct2/proxy';
+    window.openrct2_websocket_proxy = 'wss://openwebports.org/proxies/openrct2';
 }
 
 const loadingScreen = document.getElementById('loading-screen');
