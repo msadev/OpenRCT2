@@ -23,7 +23,7 @@ import net from 'net';
 const PROXY_PORT = parseInt(process.argv[2]) || 8080;
 
 // Log levels: 'error' (prod), 'info' (default), 'debug' (dev)
-const LOG_LEVEL = process.env.LOG_LEVEL || 'debug';
+const LOG_LEVEL = process.env.LOG_LEVEL || 'error';
 const LOG_LEVELS = { error: 0, info: 1, debug: 2 };
 
 const MASTER_SERVER_URL = process.env.MASTER_SERVER_URL || 'https://servers.openrct2.io';
