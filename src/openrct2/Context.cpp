@@ -417,13 +417,10 @@ namespace OpenRCT2
 
             CrashInit();
 
-            if (String::equals(Config::Get().general.lastRunVersion, kOpenRCT2Version))
+            const bool isNewVersion = !String::equals(Config::Get().general.lastRunVersion, kOpenRCT2Version);
+            gOpenRCT2ShowChangelog = false;
+            if (isNewVersion)
             {
-                gOpenRCT2ShowChangelog = false;
-            }
-            else
-            {
-                gOpenRCT2ShowChangelog = true;
                 Config::Get().general.lastRunVersion = kOpenRCT2Version;
                 Config::Save();
             }
