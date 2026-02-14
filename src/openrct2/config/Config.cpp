@@ -9,6 +9,13 @@
 
 #include "Config.h"
 
+#ifdef __EMSCRIPTEN__
+    #include <emscripten.h>
+extern "C" {
+extern void SyncPersistentData();
+}
+#endif
+
 #include "../Context.h"
 #include "../Date.h"
 #include "../Diagnostic.h"
@@ -190,7 +197,11 @@ namespace OpenRCT2::Config
             model->customCurrencyAffix = reader->GetEnum<CurrencyAffix>(
                 "custom_currency_affix", CurrencyAffix::suffix, Enum_CurrencySymbolAffix);
             model->customCurrencySymbol = reader->GetString("custom_currency_symbol", "Ctm");
+#ifdef __EMSCRIPTEN__
+            model->edgeScrolling = reader->GetBoolean("edge_scrolling", false);
+#else
             model->edgeScrolling = reader->GetBoolean("edge_scrolling", true);
+#endif
             model->edgeScrollingSpeed = reader->GetInt32("edge_scrolling_speed", 12);
             model->fullscreenMode = reader->GetInt32("fullscreen_mode", 0);
             model->fullscreenHeight = reader->GetInt32("fullscreen_height", -1);
@@ -896,7 +907,12 @@ namespace OpenRCT2::Config
 
     bool SaveToPath(u8string_view path)
     {
-        return WriteFile(path);
+        bool result = WriteFile(path);
+#ifdef __EMSCRIPTEN__
+        if (result)
+            SyncPersistentData();
+#endif
+        return result;
     }
 
     bool Save()

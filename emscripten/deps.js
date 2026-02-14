@@ -128,6 +128,29 @@ var EmscriptenDeps = {
         });
         input.click();
     },
+    $SYNC: {
+        pending: false,
+        queued: false,
+        run: () => {
+            if (SYNC.pending) {
+                SYNC.queued = true;
+                return;
+            }
+            SYNC.pending = true;
+            FS.syncfs(false, (err) => {
+                if (err) console.warn('IDBFS sync failed:', err);
+                SYNC.pending = false;
+                if (SYNC.queued) {
+                    SYNC.queued = false;
+                    SYNC.run();
+                }
+            });
+        },
+    },
+    SyncPersistentData__deps: ['$SYNC'],
+    SyncPersistentData: () => {
+        SYNC.run();
+    },
     ExportPersistentData: () => {
         if (!window.JSZip) {
             alert("JSZip library not found. Aborting");

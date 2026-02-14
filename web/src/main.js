@@ -158,11 +158,11 @@ function formatBytes(bytes) {
 
 function updateSetupScreen() {
     if (hasRCT2Files) {
-        setupMessage.textContent = 'RCT2 files found! Click Start Game to play.';
+        setupMessage.innerHTML = 'RCT game files found!<br>Click "Start Game" to play.';
         fileOptionsSection.style.display = 'none';
         startButton.disabled = false;
     } else {
-        setupMessage.textContent = 'To play, you need to provide your RCT2 game files.';
+        setupMessage.textContent = 'To play, you need to provide your RCT game files.';
         fileOptionsSection.style.display = 'block';
         startButton.disabled = true;
     }
@@ -494,6 +494,17 @@ function startGame() {
     canvas.style.display = 'block';
     fetch('https://api.github.com/repos/OpenRCT2/OpenRCT2/releases/latest')
         .then(r => r.json()).then(j => Module.FS.writeFile('/OpenRCT2/changelog.txt', j.body || '')).catch(() => {});
+
+    // Sync IDBFS on page close/reload to persist any remaining changes
+    window.addEventListener('beforeunload', () => {
+        Module.FS.syncfs(false, () => {});
+    });
+    window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            Module.FS.syncfs(false, () => {});
+        }
+    });
+
     Module.callMain(['--user-data-path=/persistent/', '--openrct2-data-path=/OpenRCT2/', '--rct1-data-path=/RCT1/']);
 }
 

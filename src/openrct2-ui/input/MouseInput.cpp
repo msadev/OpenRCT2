@@ -485,6 +485,9 @@ namespace OpenRCT2
         _dragWidget.windowClassification = w.classification;
         _dragWidget.windowNumber = w.number;
         _dragWidget.widgetIndex = widgetIndex;
+#ifdef __EMSCRIPTEN__
+        ContextHideCursor();
+#endif
     }
 
     static void InputWindowPositionContinue(
@@ -497,6 +500,9 @@ namespace OpenRCT2
     static void InputWindowPositionEnd(WindowBase& w, const ScreenCoordsXY& screenCoords)
     {
         _inputState = InputState::Normal;
+#ifdef __EMSCRIPTEN__
+        ContextShowCursor();
+#endif
         gTooltipCloseTimeout = 0;
         gTooltipWidget = _dragWidget;
         w.onMoved(screenCoords);
@@ -545,10 +551,12 @@ namespace OpenRCT2
         _ticksSinceDragStart = gCurrentRealTimeTicks;
         auto cursorPosition = ContextGetCursorPosition();
         gInputDragLast = cursorPosition;
+#ifndef __EMSCRIPTEN__
         if (!Config::Get().general.invertViewportDrag)
         {
             ContextHideCursor();
         }
+#endif
 
         // Only unfollow sprites for the main window or ‘extra viewport’ windows.
         // Don’t unfollow for windows where the viewport is always supposed to follow (e.g. Ride, Guest, Staff).
@@ -597,6 +605,11 @@ namespace OpenRCT2
                 // As the user moved the mouse, don't interpret it as right click in any case.
                 _ticksSinceDragStart = std::nullopt;
 
+#ifdef __EMSCRIPTEN__
+                // Scale mouse pixels to viewport coordinates for 1:1 drag feel
+                differentialCoords.x = viewport->zoom.ApplyTo(differentialCoords.x);
+                differentialCoords.y = viewport->zoom.ApplyTo(differentialCoords.y);
+#else
                 // applying the zoom only with negative values avoids a "deadzone" effect where small positive value round to
                 // zero.
                 const bool posX = differentialCoords.x > 0;
@@ -605,8 +618,14 @@ namespace OpenRCT2
                 differentialCoords.y = (viewport->zoom + 1).ApplyTo(-std::abs(differentialCoords.y));
                 differentialCoords.x = posX ? -differentialCoords.x : differentialCoords.x;
                 differentialCoords.y = posY ? -differentialCoords.y : differentialCoords.y;
+#endif
 
-                if (Config::Get().general.invertViewportDrag)
+#ifdef __EMSCRIPTEN__
+                const bool invert = !Config::Get().general.invertViewportDrag;
+#else
+                const bool invert = Config::Get().general.invertViewportDrag;
+#endif
+                if (invert)
                 {
                     w->savedViewPos -= differentialCoords;
                 }
@@ -635,7 +654,9 @@ namespace OpenRCT2
     static void InputViewportDragEnd()
     {
         _inputState = InputState::Reset;
+#ifndef __EMSCRIPTEN__
         ContextShowCursor();
+#endif
     }
 
 #pragma endregion

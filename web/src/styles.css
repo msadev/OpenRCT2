@@ -39,6 +39,8 @@ body {
     image-rendering: pixelated;
 }
 
+pre { text-align:initial; margin:0 auto;}
+
 /* Shared screen styles */
 #loading-screen, #setup-screen {
     text-align: center;
